@@ -61,7 +61,9 @@ bpm_light_mapper/
 
 - `live_analyzer.py`
   - opens selected input device
-  - performs rolling live tempo estimation
+  - writes incoming audio into a bounded ring buffer
+  - performs rolling live tempo estimation in a worker thread
+  - prepares reduced min/max waveform data for live rendering
   - smooths BPM history
   - emits `searching`, `unstable`, `locked`
 
@@ -105,6 +107,8 @@ bpm_light_mapper/
 - `live_panel.py`
   - live device selection
   - rolling BPM display
+  - fixed-rate UI rendering with `QTimer`
+  - optimized live waveform envelope from reduced min/max data
   - tap tempo
   - manual lock
   - BPM x and BPM / lighting timing grid
@@ -130,6 +134,16 @@ bpm_light_mapper/
 ### `app/utils`
 
 - formatting and logging helpers
+
+### Packaging
+
+- `BPM_Light_Mapper.spec`
+  - PyInstaller `onedir` configuration for Windows distribution
+  - collects Qt/audio/scientific Python dependencies and test fixtures
+
+- `tools/build_windows.ps1`
+  - repeatable Windows build entrypoint
+  - installs runtime and build requirements before invoking PyInstaller
 
 ## Data Flow
 

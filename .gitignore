@@ -18,6 +18,11 @@ build/
 dist/
 *.egg-info/
 
+# PyInstaller local output
+*.toc
+*.pyz
+*.pkg
+
 # IDE / editor
 .idea/
 .vscode/

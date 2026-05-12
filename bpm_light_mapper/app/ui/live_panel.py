@@ -3,8 +3,9 @@ from __future__ import annotations
 from statistics import mean
 from time import time
 
+import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QCheckBox,
@@ -51,6 +52,9 @@ class LivePanel(QWidget):
         self.analyzer: LiveBpmAnalyzer | None = None
         self.start_thread: LiveStartThread | None = None
         self.tap_times: list[float] = []
+        self.last_live_update_timestamp = 0.0
+        self.last_change_timestamp = 0.0
+        self.waveform_x = np.arange(360, dtype=float)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -113,6 +117,34 @@ class LivePanel(QWidget):
         cockpit.addWidget(timing_panel, 2, 0, 1, 2)
         layout.addLayout(cockpit)
 
+        waveform_panel = SectionPanel("Waveform LIVE")
+        self.waveform_plot = pg.PlotWidget()
+        self.waveform_plot.setBackground(COLORS["bg"])
+        self.waveform_plot.setMouseEnabled(x=False, y=False)
+        self.waveform_plot.hideAxis("bottom")
+        self.waveform_plot.setYRange(-1.0, 1.0)
+        self.waveform_plot.showGrid(x=False, y=True, alpha=0.10)
+        self.waveform_plot.getAxis("left").setPen(pg.mkPen("#41566a"))
+        self.waveform_plot.getAxis("left").setTextPen(pg.mkPen(COLORS["muted"]))
+        self.waveform_min_curve = self.waveform_plot.plot(
+            self.waveform_x,
+            np.zeros_like(self.waveform_x),
+            pen=pg.mkPen(COLORS["cyan_dim"], width=1),
+        )
+        self.waveform_max_curve = self.waveform_plot.plot(
+            self.waveform_x,
+            np.zeros_like(self.waveform_x),
+            pen=pg.mkPen(COLORS["cyan"], width=1),
+        )
+        self.waveform_fill = pg.FillBetweenItem(
+            self.waveform_min_curve,
+            self.waveform_max_curve,
+            brush=pg.mkBrush(40, 215, 255, 55),
+        )
+        self.waveform_plot.addItem(self.waveform_fill)
+        waveform_panel.body.addWidget(self.waveform_plot)
+        layout.addWidget(waveform_panel, 1)
+
         history_panel = SectionPanel("Historial BPM")
         self.history_plot = pg.PlotWidget()
         self.history_plot.setBackground(COLORS["bg"])
@@ -126,6 +158,10 @@ class LivePanel(QWidget):
         self.history_curve = self.history_plot.plot([], [], pen=pg.mkPen(COLORS["orange"], width=2))
         history_panel.body.addWidget(self.history_plot)
         layout.addWidget(history_panel, 1)
+
+        self.render_timer = QTimer(self)
+        self.render_timer.setInterval(33)
+        self.render_timer.timeout.connect(self._render_live_frame)
 
         self.refresh_button.clicked.connect(self.refresh_devices)
         self.start_button.clicked.connect(self.start_live)
@@ -151,8 +187,10 @@ class LivePanel(QWidget):
             return
         self.analyzer = LiveBpmAnalyzer(
             device=device,
-            callback=self.update_live_metrics,
+            callback=None,
             error_callback=self.log_message.emit,
+            visual_interval=1.0 / 30.0,
+            waveform_columns=len(self.waveform_x),
         )
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(False)
@@ -169,6 +207,9 @@ class LivePanel(QWidget):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.state_badge.set_status("LIVE")
+        self.last_live_update_timestamp = 0.0
+        self.last_change_timestamp = 0.0
+        self.render_timer.start()
         self.log_message.emit("LIVE iniciado.")
 
     def _on_live_failed(self, error: str) -> None:
@@ -190,6 +231,7 @@ class LivePanel(QWidget):
         if self.analyzer is not None:
             self.analyzer.stop()
             self.analyzer = None
+        self.render_timer.stop()
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.state_badge.set_status("SEARCHING")
@@ -210,6 +252,26 @@ class LivePanel(QWidget):
     def update_live_metrics(self, update: LiveUpdate) -> None:
         self.live_update_received.emit(update)
 
+    def _render_live_frame(self) -> None:
+        if self.analyzer is None:
+            return
+
+        visual = self.analyzer.latest_live_visual()
+        self._apply_live_visual(visual)
+
+        update = self.analyzer.latest_live_update()
+        if update is not None and update.timestamp > self.last_live_update_timestamp:
+            self.last_live_update_timestamp = update.timestamp
+            self._apply_live_update(update)
+
+    def _apply_live_visual(self, visual) -> None:
+        if len(visual.waveform_min) and len(visual.waveform_max):
+            if len(visual.waveform_min) != len(self.waveform_x):
+                self.waveform_x = np.arange(len(visual.waveform_min), dtype=float)
+            self.waveform_min_curve.setData(self.waveform_x, visual.waveform_min)
+            self.waveform_max_curve.setData(self.waveform_x, visual.waveform_max)
+        self.level_bar.setValue(int(max(0.0, min(1.0, visual.level * 8.0)) * 100))
+
     def _apply_live_update(self, update: LiveUpdate) -> None:
         display_bpm = update.bpm
         display_state = update.state.upper().replace("-", " ")
@@ -228,7 +290,6 @@ class LivePanel(QWidget):
         self.bpm_label.setText(f"{display_bpm:.2f}")
         self.state_badge.set_status(display_state)
         self.conf_card.set_value(f"{update.confidence:.2f}")
-        self.level_bar.setValue(int(max(0.0, min(1.0, update.level * 8.0)) * 100))
         beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
         self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
         self.timing_grid.set_beat_ms(beat_ms)
@@ -236,7 +297,8 @@ class LivePanel(QWidget):
         self.history_curve.setData(x, update.history)
         if normalized_half and "MANUAL" not in display_state:
             self.log_message.emit(f"Half-time normalizado a x2: {update.bpm:.2f} -> {display_bpm:.2f} BPM")
-        if update.change_detected:
+        if update.change_detected and update.timestamp > self.last_change_timestamp:
+            self.last_change_timestamp = update.timestamp
             self.log_message.emit(f"Cambio de BPM detectado cerca de {update.bpm:.2f} BPM.")
 
     def _toggle_manual_lock(self, checked: bool) -> None:

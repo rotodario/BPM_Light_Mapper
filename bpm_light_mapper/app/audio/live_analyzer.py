@@ -25,6 +25,15 @@ class LiveUpdate:
     timestamp: float
 
 
+@dataclass
+class LiveVisualState:
+    level: float
+    peak: float
+    waveform_min: np.ndarray
+    waveform_max: np.ndarray
+    timestamp: float
+
+
 class LiveBpmAnalyzer:
     def __init__(
         self,
@@ -34,6 +43,9 @@ class LiveBpmAnalyzer:
         block_size: int = 1024,
         window_seconds: float = 10.0,
         update_interval: float = 0.25,
+        visual_interval: float = 1.0 / 30.0,
+        waveform_seconds: float = 2.5,
+        waveform_columns: int = 360,
         hop_length: int = 512,
         bpm_min: float = 35.0,
         bpm_max: float = 190.0,
@@ -47,6 +59,9 @@ class LiveBpmAnalyzer:
         self.block_size = block_size
         self.window_samples = int(window_seconds * sample_rate)
         self.update_interval = update_interval
+        self.visual_interval = visual_interval
+        self.waveform_samples = int(waveform_seconds * sample_rate)
+        self.waveform_columns = waveform_columns
         self.hop_length = hop_length
         self.bpm_min = bpm_min
         self.bpm_max = bpm_max
@@ -57,6 +72,15 @@ class LiveBpmAnalyzer:
         self.write_index = 0
         self.filled_samples = 0
         self.latest_level = 0.0
+        self.latest_peak = 0.0
+        self.latest_visual = LiveVisualState(
+            level=0.0,
+            peak=0.0,
+            waveform_min=np.zeros(self.waveform_columns, dtype=np.float32),
+            waveform_max=np.zeros(self.waveform_columns, dtype=np.float32),
+            timestamp=0.0,
+        )
+        self.latest_update: LiveUpdate | None = None
         self.history: list[float] = []
         self.last_bpms: list[float] = []
         self.smoothed_bpm = 0.0
@@ -67,6 +91,7 @@ class LiveBpmAnalyzer:
         self.buffer_lock = threading.Lock()
         self.stop_event = threading.Event()
         self.analysis_thread: threading.Thread | None = None
+        self.visual_thread: threading.Thread | None = None
         self.last_error: str | None = None
 
     @staticmethod
@@ -98,6 +123,8 @@ class LiveBpmAnalyzer:
         self.stream.start()
         self.analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
         self.analysis_thread.start()
+        self.visual_thread = threading.Thread(target=self._visual_loop, daemon=True)
+        self.visual_thread.start()
 
     def stop(self) -> None:
         self.logger.info("Stopping live analyzer")
@@ -109,16 +136,18 @@ class LiveBpmAnalyzer:
         if self.analysis_thread is not None and self.analysis_thread.is_alive():
             self.analysis_thread.join(timeout=1.0)
         self.analysis_thread = None
+        if self.visual_thread is not None and self.visual_thread.is_alive():
+            self.visual_thread.join(timeout=1.0)
+        self.visual_thread = None
 
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         del frames, time_info, status
         try:
+            # The audio callback must stay cheap: convert, write, return.
             mono = np.mean(indata, axis=1)
-            level = float(np.sqrt(np.mean(np.square(mono)))) if len(mono) else 0.0
             block = np.asarray(mono, dtype=np.float32)
             with self.buffer_lock:
                 self._write_block(block)
-                self.latest_level = (self.latest_level * 0.75) + (level * 0.25)
         except Exception as exc:
             self._report_error(f"Error en callback LIVE: {exc}")
 
@@ -153,6 +182,30 @@ class LiveBpmAnalyzer:
                 )
             return window, self.latest_level
 
+    def _snapshot_recent(self, max_samples: int) -> np.ndarray | None:
+        with self.buffer_lock:
+            available = min(self.filled_samples, max_samples)
+            if available <= 0:
+                return None
+            start = (self.write_index - available) % self.window_samples
+            if start < self.write_index:
+                return self.buffer[start : self.write_index].copy()
+            return np.concatenate((self.buffer[start:], self.buffer[: self.write_index])).astype(np.float32, copy=False)
+
+    def latest_live_update(self) -> LiveUpdate | None:
+        with self.buffer_lock:
+            return self.latest_update
+
+    def latest_live_visual(self) -> LiveVisualState:
+        with self.buffer_lock:
+            return LiveVisualState(
+                level=self.latest_visual.level,
+                peak=self.latest_visual.peak,
+                waveform_min=self.latest_visual.waveform_min.copy(),
+                waveform_max=self.latest_visual.waveform_max.copy(),
+                timestamp=self.latest_visual.timestamp,
+            )
+
     def _analysis_loop(self) -> None:
         next_run = time.time()
         while not self.stop_event.is_set():
@@ -165,6 +218,48 @@ class LiveBpmAnalyzer:
             if window is None:
                 continue
             self._process_window(window, level, time.time())
+
+    def _visual_loop(self) -> None:
+        next_run = time.time()
+        while not self.stop_event.is_set():
+            if self.stop_event.wait(max(0.0, next_run - time.time())):
+                return
+            next_run = time.time() + self.visual_interval
+            samples = self._snapshot_recent(self.waveform_samples)
+            if samples is None:
+                continue
+            visual = self._build_visual_state(samples, time.time())
+            with self.buffer_lock:
+                self.latest_visual = visual
+                self.latest_level = visual.level
+                self.latest_peak = visual.peak
+
+    def _build_visual_state(self, samples: np.ndarray, now: float) -> LiveVisualState:
+        if samples.size == 0:
+            min_values = np.zeros(self.waveform_columns, dtype=np.float32)
+            max_values = np.zeros(self.waveform_columns, dtype=np.float32)
+            return LiveVisualState(0.0, 0.0, min_values, max_values, now)
+
+        peak = float(np.max(np.abs(samples)))
+        rms = float(np.sqrt(np.mean(np.square(samples))))
+        min_values, max_values = self._min_max_envelope(samples, self.waveform_columns)
+        level = (self.latest_level * 0.80) + (rms * 0.20)
+        peak_hold = max(peak, self.latest_peak * 0.92)
+        return LiveVisualState(level, peak_hold, min_values, max_values, now)
+
+    @staticmethod
+    def _min_max_envelope(samples: np.ndarray, columns: int) -> tuple[np.ndarray, np.ndarray]:
+        if columns <= 0:
+            return np.zeros(0, dtype=np.float32), np.zeros(0, dtype=np.float32)
+        if samples.size < columns:
+            padded = np.zeros(columns, dtype=np.float32)
+            padded[-samples.size :] = samples
+            samples = padded
+        usable = (samples.size // columns) * columns
+        if usable <= 0:
+            return np.zeros(columns, dtype=np.float32), np.zeros(columns, dtype=np.float32)
+        reshaped = samples[-usable:].reshape(columns, usable // columns)
+        return reshaped.min(axis=1).astype(np.float32), reshaped.max(axis=1).astype(np.float32)
 
     def _process_window(self, window: np.ndarray, level: float, now: float) -> None:
         try:
@@ -202,19 +297,20 @@ class LiveBpmAnalyzer:
                 if abs(smoothed - prev) >= 3.0 and state != "searching":
                     change_detected = True
 
+            update = LiveUpdate(
+                bpm=smoothed,
+                confidence=confidence,
+                state=state,
+                level=level,
+                beat_ms=(60000.0 / smoothed) if smoothed > 0 else 0.0,
+                history=list(self.history),
+                change_detected=change_detected,
+                timestamp=now,
+            )
+            with self.buffer_lock:
+                self.latest_update = update
             if self.callback is not None:
-                self.callback(
-                    LiveUpdate(
-                        bpm=smoothed,
-                        confidence=confidence,
-                        state=state,
-                        level=level,
-                        beat_ms=(60000.0 / smoothed) if smoothed > 0 else 0.0,
-                        history=list(self.history),
-                        change_detected=change_detected,
-                        timestamp=now,
-                    )
-                )
+                self.callback(update)
             self.last_state = state
         except Exception as exc:
             self._report_error(f"Error de analisis LIVE: {exc}")

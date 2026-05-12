@@ -36,6 +36,29 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Ejecutable Windows
+
+Build recomendado con PyInstaller en formato carpeta (`onedir`):
+
+```powershell
+.\tools\build_windows.ps1 -Clean
+```
+
+Si PowerShell bloquea scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\build_windows.ps1 -Clean
+```
+
+Salida:
+
+```text
+dist\BPM Light Mapper\BPM Light Mapper.exe
+```
+
+Distribuye la carpeta completa `dist\BPM Light Mapper`, no solo el `.exe`.
+Ver detalles y checklist en [docs/PACKAGING.md](docs/PACKAGING.md).
+
 ## Formatos soportados
 
 - WAV

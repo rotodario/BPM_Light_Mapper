@@ -20,11 +20,31 @@ It should help an operator answer:
 - confidence display
 - state display
 - BPM history graph
+- optimized live waveform envelope
 - tap tempo
 - manual tap lock
 - BPM x and BPM / timing grid for lighting divisions
 - dark HUD panel optimized for visibility from a control position
 - non-blocking live startup so device errors should return to the UI instead of freezing it
+
+## Runtime Architecture
+
+The live path is designed like a real-time instrument panel:
+
+```text
+audio input -> ring buffer -> DSP blocks -> reduced visual state -> fixed-rate UI render
+```
+
+Key rules:
+
+- the audio callback only converts input to mono and writes blocks into the ring buffer
+- BPM analysis runs in a worker thread at a lower stable rate
+- waveform/level visual data is reduced in a separate visual loop
+- the UI renders from the latest processed state with a fixed `QTimer`
+- the waveform uses min/max columns instead of drawing every sample
+- buffers and histories have bounded sizes
+
+This means the UI should remain responsive even if BPM analysis is temporarily expensive.
 
 ## Detection States
 

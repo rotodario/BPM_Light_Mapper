@@ -18,6 +18,8 @@
 - JSON/CSV/TXT export
 - live device listing
 - live BPM estimation with rolling history
+- fixed-rate live UI render loop decoupled from audio/DSP updates
+- optimized live waveform envelope using bounded min/max reduction
 - live confidence and state labels
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
@@ -26,6 +28,7 @@
 - synthetic test generator script
 - committed synthetic audio fixtures and validation runner
 - Markdown BPM validation report generation
+- PyInstaller `onedir` packaging config for Windows executable builds
 
 ## Not Implemented Yet
 
@@ -34,6 +37,8 @@
 - explicit beat audition
 - persistent project save/load
 - advanced confidence diagnostics UI
+- signed installer / code signing
+- tested `onefile` executable build
 
 ## Current Focus
 
