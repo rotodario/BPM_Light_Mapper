@@ -102,7 +102,7 @@ bpm_light_mapper/
   - rolling BPM display
   - tap tempo
   - manual lock
-  - useful beat-duration subdivisions in ms
+  - BPM x and BPM / lighting timing grid
 
 - `theme.py`
   - central dark HUD palette
@@ -148,7 +148,7 @@ bpm_light_mapper/
 3. Rolling windows are converted to onset energy.
 4. Tempo is estimated continuously.
 5. Smoothed BPM, confidence and state are emitted to the UI.
-6. `live_panel.py` shows BPM history, level and useful durations.
+6. `live_panel.py` shows BPM history, level and lighting timing equivalents.
 
 ## Heuristic Areas
 

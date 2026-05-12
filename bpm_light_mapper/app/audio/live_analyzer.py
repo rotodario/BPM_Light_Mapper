@@ -7,6 +7,7 @@ from typing import Callable
 
 import numpy as np
 import sounddevice as sd
+from scipy.signal import find_peaks
 
 from bpm_light_mapper.app.audio.beat_tracker import compute_onset_envelope
 from bpm_light_mapper.app.utils.logging_utils import get_logger
@@ -34,7 +35,7 @@ class LiveBpmAnalyzer:
         window_seconds: float = 10.0,
         update_interval: float = 0.25,
         hop_length: int = 512,
-        bpm_min: float = 55.0,
+        bpm_min: float = 35.0,
         bpm_max: float = 190.0,
         callback: Callable[[LiveUpdate], None] | None = None,
         error_callback: Callable[[str], None] | None = None,
@@ -59,6 +60,9 @@ class LiveBpmAnalyzer:
         self.history: list[float] = []
         self.last_bpms: list[float] = []
         self.smoothed_bpm = 0.0
+        self.locked_bpm = 0.0
+        self.pending_bpm = 0.0
+        self.pending_count = 0
         self.last_state = "searching"
         self.buffer_lock = threading.Lock()
         self.stop_event = threading.Event()
@@ -165,6 +169,7 @@ class LiveBpmAnalyzer:
     def _process_window(self, window: np.ndarray, level: float, now: float) -> None:
         try:
             bpm, confidence = self._estimate_bpm(window)
+            bpm = self._apply_hysteresis(bpm, confidence)
             if bpm <= 0.0:
                 smoothed = self.smoothed_bpm
             elif self.smoothed_bpm <= 0.0:
@@ -214,6 +219,48 @@ class LiveBpmAnalyzer:
         except Exception as exc:
             self._report_error(f"Error de analisis LIVE: {exc}")
 
+    def _apply_hysteresis(self, bpm: float, confidence: float) -> float:
+        if bpm <= 0.0:
+            return self.locked_bpm if self.locked_bpm > 0.0 else 0.0
+        if self.locked_bpm <= 0.0:
+            self.locked_bpm = bpm
+            self.pending_bpm = 0.0
+            self.pending_count = 0
+            return bpm
+
+        ratio = bpm / self.locked_bpm
+        same_tempo = 0.85 <= ratio <= 1.15
+        octave_change = 0.45 <= ratio <= 0.55 or 1.8 <= ratio <= 2.2
+        large_change = 0.60 <= ratio <= 0.85 or 1.15 <= ratio <= 1.65
+
+        if same_tempo:
+            self.locked_bpm = (self.locked_bpm * 0.8) + (bpm * 0.2)
+            self.pending_bpm = 0.0
+            self.pending_count = 0
+            return self.locked_bpm
+
+        if octave_change or large_change:
+            if self.pending_bpm > 0.0 and abs(self.pending_bpm - bpm) <= max(1.0, self.pending_bpm * 0.08):
+                self.pending_count += 1
+            else:
+                self.pending_bpm = bpm
+                self.pending_count = 1
+
+            required_hits = 8 if octave_change else 4
+            confidence_gate = 0.55 if octave_change else 0.60
+            if self.pending_count >= required_hits and confidence >= confidence_gate:
+                self.locked_bpm = bpm
+                self.pending_bpm = 0.0
+                self.pending_count = 0
+                self.logger.info("LIVE BPM locked to %.2f after hysteresis", bpm)
+                return bpm
+
+            return self.locked_bpm
+
+        self.pending_bpm = 0.0
+        self.pending_count = 0
+        return bpm
+
     def _estimate_bpm(self, samples: np.ndarray) -> tuple[float, float]:
         full_bpm, full_confidence = self._estimate_bpm_from_samples(samples)
         recent_seconds = 4.5
@@ -229,11 +276,6 @@ class LiveBpmAnalyzer:
         if bpm <= 0.0:
             return 0.0, 0.0
 
-        if self.smoothed_bpm > 0.0:
-            related = np.array([bpm / 2.0, bpm, bpm * 2.0], dtype=float)
-            valid = related[(related >= self.bpm_min) & (related <= self.bpm_max)]
-            if valid.size:
-                bpm = float(valid[int(np.argmin(np.abs(valid - self.smoothed_bpm)))])
         return bpm, float(np.clip(confidence, 0.0, 1.0))
 
     def _estimate_bpm_from_samples(self, samples: np.ndarray) -> tuple[float, float]:
@@ -266,27 +308,65 @@ class LiveBpmAnalyzer:
         while bpm > self.bpm_max:
             bpm /= 2.0
         max_local = float(np.max(local))
-        if bpm < 85.0 and bpm * 2.0 <= self.bpm_max:
-            double_lag = lag / 2.0
-            double_index = int(round(double_lag - lag_min))
-            double_strength = 0.0
-            if 0 <= double_index < len(local) and max_local > 1e-9:
-                double_strength = float(local[double_index]) / max_local
-            previous_prefers_double = (
-                self.smoothed_bpm > 0.0
-                and abs((bpm * 2.0) - self.smoothed_bpm) < abs(bpm - self.smoothed_bpm)
-            )
-            if double_strength >= 0.35 or previous_prefers_double:
-                bpm *= 2.0
-
         normalized_peak = max_local / max(float(corr[0]), 1e-9)
         sorted_peaks = np.sort(local)
         contrast = 0.0
         if len(sorted_peaks) >= 4 and sorted_peaks[-1] > 1e-9:
             contrast = float((sorted_peaks[-1] - sorted_peaks[-4]) / sorted_peaks[-1])
         energy_score = float(np.clip(np.percentile(onset_env, 90) * 1.4, 0.0, 1.0))
-        confidence = (normalized_peak * 0.55) + (contrast * 0.30) + (energy_score * 0.15)
+        bpm = self._resolve_octave_by_peak_spacing(onset_env, bpm)
+        confidence = (normalized_peak * 0.50) + (contrast * 0.25) + (energy_score * 0.25)
         return float(np.clip(bpm, self.bpm_min, self.bpm_max)), float(np.clip(confidence, 0.0, 1.0))
+
+    def _resolve_octave_by_peak_spacing(self, onset_env: np.ndarray, bpm: float) -> float:
+        candidates = [bpm]
+        if bpm / 2.0 >= self.bpm_min:
+            candidates.append(bpm / 2.0)
+        if bpm * 2.0 <= self.bpm_max:
+            candidates.append(bpm * 2.0)
+
+        env = np.asarray(onset_env, dtype=float)
+        if len(env) < 8 or np.max(env) <= 1e-9:
+            return bpm
+
+        env_max = max(float(np.max(env)), 1e-9)
+        prominence = max(0.03, env_max * 0.08)
+        peaks, _ = find_peaks(env, distance=2, prominence=prominence)
+        if len(peaks) < 3:
+            return bpm
+
+        best_bpm = bpm
+        best_score = self._tempo_match_score(peaks, env, bpm)
+        for candidate in candidates[1:]:
+            score = self._tempo_match_score(peaks, env, candidate)
+            if score > best_score + 0.08:
+                best_score = score
+                best_bpm = candidate
+        return best_bpm
+
+    def _tempo_match_score(self, peaks: np.ndarray, onset_env: np.ndarray, bpm: float) -> float:
+        if bpm <= 0.0 or len(peaks) < 3:
+            return 0.0
+        period = (60.0 * self.sample_rate) / (self.hop_length * bpm)
+        if period <= 1.0:
+            return 0.0
+        env = np.asarray(onset_env, dtype=float)
+        env_max = max(float(np.max(env)), 1e-9)
+        interval_error = 0.0
+        intervals = np.diff(peaks.astype(float))
+        if len(intervals) > 0:
+            normalized = np.abs(intervals - period) / max(period, 1e-9)
+            interval_error = float(np.clip(np.median(normalized), 0.0, 2.0))
+        interval_score = float(np.clip(1.0 - interval_error, 0.0, 1.0))
+
+        tolerance = max(1, int(round(period * 0.18)))
+        aligned = 0
+        for peak in peaks:
+            if abs((peak % max(1, int(round(period))))) <= tolerance:
+                aligned += 1
+        grid_score = aligned / len(peaks)
+        peak_energy = float(np.mean(env[peaks]) / env_max) if len(peaks) else 0.0
+        return (interval_score * 0.60) + (grid_score * 0.25) + (peak_energy * 0.15)
 
     def _report_error(self, message: str) -> None:
         if message == self.last_error:

@@ -61,11 +61,11 @@ Nota: el soporte MP3 depende del backend disponible en tu entorno (`soundfile` o
 - BPM rolling con historial
 - Estado de bloqueo
 - Tap tempo manual
-- Tiempos utiles para iluminacion en ms
+- Tiempos utiles para iluminacion en BPM x y BPM /
 
 ## Validacion sintetica
 
-Genera señales sinteticas y ejecuta un analisis basico:
+Genera senales sinteticas y ejecuta un analisis basico:
 
 ```bash
 python -m bpm_light_mapper.app.audio.synthetic_tests

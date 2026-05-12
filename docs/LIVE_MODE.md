@@ -9,7 +9,7 @@ It should help an operator answer:
 - what BPM am I probably hearing now
 - is it stable enough to trust
 - has it changed recently
-- what are the timing subdivisions in milliseconds
+- what are the timing equivalents in BPM for useful lighting divisions
 
 ## Current Features
 
@@ -22,7 +22,7 @@ It should help an operator answer:
 - BPM history graph
 - tap tempo
 - manual tap lock
-- beat-length subdivisions in ms
+- BPM x and BPM / timing grid for lighting divisions
 - dark HUD panel optimized for visibility from a control position
 - non-blocking live startup so device errors should return to the UI instead of freezing it
 
@@ -111,29 +111,19 @@ Recommended approach:
 2. tap manually if needed
 3. engage `Lock TAP` if you need a stable working reference
 
-## Reading the Millisecond Values
+## Reading the BPM Equivalents
 
-For a given BPM:
+The timing grid shows the base BPM multiplied and divided by common lighting factors:
 
-- `1/1` = one beat
-- `1/2` = half beat
-- `1/4` = quarter beat
-- `1/8` = eighth beat
-- `1/16` = sixteenth beat
+- `1x`
+- `2x`
+- `4x`
+- `8x`
+- `16x`
 
-Formula:
+and the corresponding `/` column for lower-rate equivalents.
 
-```text
-beat_ms = 60000 / BPM
-```
-
-Example at 128 BPM:
-
-- `1/1` = 468.75 ms
-- `1/2` = 234.38 ms
-- `1/4` = 117.19 ms
-- `1/8` = 58.59 ms
-- `1/16` = 29.30 ms
+This is useful when you want to program chases, strobes or bumps against a faster or slower clock without doing the mental math live.
 
 ## Limitations
 

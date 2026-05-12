@@ -47,7 +47,7 @@ Typical use cases:
    - state
    - input level
    - BPM history
-   - timing values in ms
+   - BPM x and BPM / timing grid
 6. Use `Tap Tempo` when live detection is unstable.
 7. Use `Lock TAP` to temporarily hold a manual BPM reference.
 8. Click `Parar LIVE` when done.

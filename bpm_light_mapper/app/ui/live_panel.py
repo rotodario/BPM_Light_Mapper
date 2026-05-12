@@ -7,6 +7,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QCheckBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -66,6 +67,8 @@ class LivePanel(QWidget):
         self.tap_button = QPushButton("TAP")
         self.lock_button = QPushButton("Lock TAP")
         self.lock_button.setCheckable(True)
+        self.normalize_half_button = QCheckBox("Normalizar half-time x2")
+        self.normalize_half_button.setChecked(False)
         top.addWidget(QLabel("INPUT"))
         top.addWidget(self.device_combo, 1)
         top.addWidget(self.refresh_button)
@@ -73,6 +76,7 @@ class LivePanel(QWidget):
         top.addWidget(self.stop_button)
         top.addWidget(self.tap_button)
         top.addWidget(self.lock_button)
+        top.addWidget(self.normalize_half_button)
         layout.addLayout(top)
 
         cockpit = QGridLayout()
@@ -209,6 +213,12 @@ class LivePanel(QWidget):
     def _apply_live_update(self, update: LiveUpdate) -> None:
         display_bpm = update.bpm
         display_state = update.state.upper().replace("-", " ")
+        normalized_half = False
+        if self.normalize_half_button.isChecked() and 60.0 <= display_bpm < 90.0 and update.confidence >= 0.55:
+            doubled = display_bpm * 2.0
+            if doubled <= 190.0:
+                display_bpm = doubled
+                normalized_half = True
         if self.lock_button.isChecked():
             try:
                 display_bpm = float(self.tap_card.value_label.text())
@@ -224,6 +234,8 @@ class LivePanel(QWidget):
         self.timing_grid.set_beat_ms(beat_ms)
         x = list(range(len(update.history)))
         self.history_curve.setData(x, update.history)
+        if normalized_half and "MANUAL" not in display_state:
+            self.log_message.emit(f"Half-time normalizado a x2: {update.bpm:.2f} -> {display_bpm:.2f} BPM")
         if update.change_detected:
             self.log_message.emit(f"Cambio de BPM detectado cerca de {update.bpm:.2f} BPM.")
 
