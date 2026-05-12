@@ -4,7 +4,7 @@ from statistics import mean
 from time import time
 
 import pyqtgraph as pg
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -25,6 +25,22 @@ from bpm_light_mapper.app.ui.theme import COLORS
 from bpm_light_mapper.app.ui.timing_grid import TimingGrid
 
 
+class LiveStartThread(QThread):
+    started_ok = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, analyzer: LiveBpmAnalyzer) -> None:
+        super().__init__()
+        self.analyzer = analyzer
+
+    def run(self) -> None:
+        try:
+            self.analyzer.start()
+            self.started_ok.emit(self.analyzer)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class LivePanel(QWidget):
     log_message = Signal(str)
     live_update_received = Signal(object)
@@ -32,6 +48,7 @@ class LivePanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.analyzer: LiveBpmAnalyzer | None = None
+        self.start_thread: LiveStartThread | None = None
         self.tap_times: list[float] = []
 
         layout = QVBoxLayout(self)
@@ -133,18 +150,39 @@ class LivePanel(QWidget):
             callback=self.update_live_metrics,
             error_callback=self.log_message.emit,
         )
-        try:
-            self.analyzer.start()
-        except Exception as exc:
-            self.analyzer = None
-            self.log_message.emit(f"No se pudo iniciar LIVE: {exc}")
-            return
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(False)
+        self.state_badge.set_status("SEARCHING")
+        self.log_message.emit("Iniciando LIVE...")
+        self.start_thread = LiveStartThread(self.analyzer)
+        self.start_thread.started_ok.connect(self._on_live_started)
+        self.start_thread.failed.connect(self._on_live_failed)
+        self.start_thread.finished.connect(self._on_live_start_thread_finished)
+        self.start_thread.start()
+
+    def _on_live_started(self, analyzer: LiveBpmAnalyzer) -> None:
+        self.analyzer = analyzer
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.state_badge.set_status("LIVE")
         self.log_message.emit("LIVE iniciado.")
 
+    def _on_live_failed(self, error: str) -> None:
+        self.analyzer = None
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.state_badge.set_status("ERROR")
+        self.log_message.emit(f"No se pudo iniciar LIVE: {error}")
+
+    def _on_live_start_thread_finished(self) -> None:
+        self.start_thread = None
+
     def stop_live(self) -> None:
+        if self.start_thread is not None and self.start_thread.isRunning():
+            self.log_message.emit("LIVE aun esta inicializando; se cerrara al terminar el intento de arranque.")
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            return
         if self.analyzer is not None:
             self.analyzer.stop()
             self.analyzer = None

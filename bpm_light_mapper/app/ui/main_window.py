@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QCloseEvent
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -101,6 +102,10 @@ class MainWindow(QMainWindow):
         self.beat_offset_applied = 0.0
         self.busy_state = "idle"
         self.is_closing = False
+        self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(0.85)
+        self.player = QMediaPlayer()
+        self.player.setAudioOutput(self.audio_output)
 
         root = QWidget()
         root.setObjectName("Root")
@@ -120,6 +125,8 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.tabs, 1)
 
         self._connect_actions()
+        self.player.positionChanged.connect(self.on_player_position_changed)
+        self.player.playbackStateChanged.connect(self.on_player_state_changed)
         self._set_buttons_enabled(False)
         self.load_button.setEnabled(True)
         self.analyze_button.setEnabled(False)
@@ -173,6 +180,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
 
         splitter = QSplitter()
+        splitter.setChildrenCollapsible(False)
         layout.addWidget(splitter, 1)
 
         left = QWidget()
@@ -180,11 +188,36 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
 
-        waveform_panel = SectionPanel("Waveform / Beat Grid / Tempo Zones")
-        self.waveform_widget = WaveformWidget()
-        waveform_panel.body.addWidget(self.waveform_widget)
-        left_layout.addWidget(waveform_panel, 4)
+        left_splitter = QSplitter()
+        left_splitter.setOrientation(Qt.Vertical)
+        left_splitter.setChildrenCollapsible(False)
+        left_layout.addWidget(left_splitter, 1)
 
+        waveform_area = QWidget()
+        waveform_area_layout = QVBoxLayout(waveform_area)
+        waveform_area_layout.setContentsMargins(0, 0, 0, 0)
+        waveform_area_layout.setSpacing(10)
+        waveform_panel = SectionPanel("Waveform / Beat Grid / Tempo Zones")
+        transport = QHBoxLayout()
+        self.play_button = QPushButton("Play")
+        self.play_button.setProperty("role", "primary")
+        self.stop_button = QPushButton("Stop")
+        self.position_label = QLabel("00:00.000")
+        self.position_label.setObjectName("HeaderMeta")
+        transport.addWidget(self.play_button)
+        transport.addWidget(self.stop_button)
+        transport.addWidget(self.position_label)
+        transport.addStretch(1)
+        self.waveform_widget = WaveformWidget()
+        waveform_panel.body.addLayout(transport)
+        waveform_panel.body.addWidget(self.waveform_widget)
+        waveform_area_layout.addWidget(waveform_panel)
+        left_splitter.addWidget(waveform_area)
+
+        bottom_area = QWidget()
+        bottom_layout = QVBoxLayout(bottom_area)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(10)
         segment_panel = SectionPanel("Segmentos BPM")
         edit_row = QHBoxLayout()
         self.add_segment_button = QPushButton("Anadir zona")
@@ -202,14 +235,18 @@ class MainWindow(QMainWindow):
         self.segment_table = SegmentTable()
         segment_panel.body.addLayout(edit_row)
         segment_panel.body.addWidget(self.segment_table)
-        left_layout.addWidget(segment_panel, 2)
+        bottom_layout.addWidget(segment_panel, 1)
 
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setMaximumHeight(120)
-        left_layout.addWidget(self.log_box)
+        self.log_box.setMaximumHeight(110)
+        bottom_layout.addWidget(self.log_box)
+        left_splitter.addWidget(bottom_area)
+        left_splitter.setSizes([520, 300])
 
         right = QWidget()
+        right.setMinimumWidth(420)
+        right.setMaximumWidth(540)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
@@ -217,6 +254,8 @@ class MainWindow(QMainWindow):
         metrics_panel = SectionPanel("Indicadores")
         metrics_grid = QGridLayout()
         metrics_grid.setSpacing(10)
+        metrics_grid.setColumnMinimumWidth(0, 170)
+        metrics_grid.setColumnMinimumWidth(1, 170)
         self.global_bpm_card = MetricCard("BPM Global", "-")
         self.zone_bpm_card = MetricCard("BPM Zona", "-")
         self.confidence_card = MetricCard("Confidence", "-", compact=True)
@@ -259,6 +298,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 5)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([1050, 430])
         return tab
 
     def _build_params_box(self) -> QGroupBox:
@@ -288,6 +328,9 @@ class MainWindow(QMainWindow):
         self.load_button.clicked.connect(self.load_file)
         self.analyze_button.clicked.connect(self.start_analysis)
         self.live_nav_button.clicked.connect(lambda: self.tabs.setCurrentWidget(self.live_panel))
+        self.play_button.clicked.connect(self.toggle_playback)
+        self.stop_button.clicked.connect(self.stop_playback)
+        self.waveform_widget.seek_requested.connect(self.seek_playback)
         self.export_json_button.clicked.connect(self.export_json)
         self.export_csv_button.clicked.connect(self.export_csv)
         self.export_txt_button.clicked.connect(self.export_txt)
@@ -312,6 +355,13 @@ class MainWindow(QMainWindow):
         minutes = int(seconds // 60)
         rest = int(seconds % 60)
         return f"{minutes:02d}:{rest:02d}"
+
+    @staticmethod
+    def _format_position_ms(milliseconds: int) -> str:
+        total_ms = max(0, int(milliseconds))
+        minutes, rem = divmod(total_ms, 60000)
+        seconds, ms = divmod(rem, 1000)
+        return f"{minutes:02d}:{seconds:02d}.{ms:03d}"
 
     def _analysis_params(self) -> OfflineAnalysisParameters:
         params = OfflineAnalysisParameters(
@@ -420,6 +470,8 @@ class MainWindow(QMainWindow):
         self.current_file = file_path
         self.current_audio = None
         self.analysis_result = None
+        self.player.setSource(QUrl.fromLocalFile(file_path))
+        self.position_label.setText("00:00.000")
         self.file_info.setText(f"Archivo: {Path(file_path).name}")
         self._update_empty_metrics()
         self.waveform_widget.set_waveform([], 0.0)
@@ -553,6 +605,35 @@ class MainWindow(QMainWindow):
         self._set_busy(False, "IDLE", "analisis cancelado")
         self.log("Analisis cancelado.")
 
+    def toggle_playback(self) -> None:
+        if not self.current_file:
+            return
+        if self.player.source().isEmpty():
+            self.player.setSource(QUrl.fromLocalFile(self.current_file))
+        if self.player.playbackState() == QMediaPlayer.PlayingState:
+            self.player.pause()
+        else:
+            self.player.play()
+
+    def stop_playback(self) -> None:
+        self.player.stop()
+        self.waveform_widget.set_playhead(0.0)
+        self.position_label.setText("00:00.000")
+
+    def seek_playback(self, seconds: float) -> None:
+        if self.current_file and self.player.source().isEmpty():
+            self.player.setSource(QUrl.fromLocalFile(self.current_file))
+        self.player.setPosition(int(max(0.0, seconds) * 1000))
+        self.position_label.setText(self._format_position_ms(int(seconds * 1000)))
+
+    def on_player_position_changed(self, milliseconds: int) -> None:
+        seconds = milliseconds / 1000.0
+        self.waveform_widget.set_playhead(seconds)
+        self.position_label.setText(self._format_position_ms(milliseconds))
+
+    def on_player_state_changed(self, state) -> None:
+        self.play_button.setText("Pause" if state == QMediaPlayer.PlayingState else "Play")
+
     def on_segment_selected(self, row: int) -> None:
         if self.analysis_result is None or row < 0 or row >= len(self.analysis_result.segments):
             return
@@ -679,6 +760,7 @@ class MainWindow(QMainWindow):
         self.logger.info("Close requested")
         self.is_closing = True
         self._set_app_state("IDLE", "cerrando...")
+        self.player.stop()
         self.live_panel.stop_live()
         if self.audio_load_thread is not None and self.audio_load_thread.isRunning():
             self.audio_load_thread.requestInterruption()

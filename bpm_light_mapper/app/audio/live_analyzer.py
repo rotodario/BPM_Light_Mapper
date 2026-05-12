@@ -6,10 +6,10 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Callable
 
-import librosa
 import numpy as np
 import sounddevice as sd
 
+from bpm_light_mapper.app.audio.beat_tracker import compute_onset_envelope
 from bpm_light_mapper.app.utils.logging_utils import get_logger
 
 
@@ -65,7 +65,6 @@ class LiveBpmAnalyzer:
 
     def start(self) -> None:
         self.logger.info("Starting live analyzer on device=%s sr=%s block_size=%s", self.device, self.sample_rate, self.block_size)
-        self._warmup_librosa()
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
             blocksize=self.block_size,
@@ -148,28 +147,26 @@ class LiveBpmAnalyzer:
         finally:
             self.analysis_running = False
 
-    def _warmup_librosa(self) -> None:
-        dummy_audio = np.zeros(2048, dtype=np.float32)
-        dummy_onsets = np.zeros(32, dtype=np.float32)
-        librosa.onset.onset_strength(y=dummy_audio, sr=self.sample_rate, aggregate=np.median)
-        librosa.feature.tempo(onset_envelope=dummy_onsets, sr=self.sample_rate)
-
     def _estimate_bpm(self, samples: np.ndarray) -> tuple[float, float]:
-        onset_env = librosa.onset.onset_strength(y=samples, sr=self.sample_rate, aggregate=np.median)
+        onset_env, _ = compute_onset_envelope(samples, self.sample_rate, hop_length=1024)
         if len(onset_env) < 8 or np.max(onset_env) <= 1e-6:
             return 0.0, 0.0
-        tempo = librosa.feature.tempo(
-            onset_envelope=onset_env,
-            sr=self.sample_rate,
-            aggregate=None,
-            max_tempo=190.0,
-        )
-        tempo = np.asarray(tempo, dtype=float)
-        if len(tempo) == 0:
+        novelty = onset_env.astype(float) - float(np.mean(onset_env))
+        corr = np.correlate(novelty, novelty, mode="full")[len(novelty) - 1 :]
+        lag_min = max(1, int(np.floor((60.0 / 190.0) * self.sample_rate / 1024)))
+        lag_max = min(len(corr) - 1, int(np.ceil((60.0 / 55.0) * self.sample_rate / 1024)))
+        if lag_max <= lag_min:
             return 0.0, 0.0
-        bpm = float(np.median(tempo))
-        spread = float(np.std(tempo))
-        confidence = float(np.clip(1.0 - spread / max(bpm, 1e-6), 0.0, 1.0))
+        local = corr[lag_min : lag_max + 1]
+        if len(local) == 0 or np.max(local) <= 1e-9:
+            return 0.0, 0.0
+        lag = lag_min + int(np.argmax(local))
+        bpm = 60.0 * self.sample_rate / (1024 * lag)
+        while bpm < 55.0:
+            bpm *= 2.0
+        while bpm > 190.0:
+            bpm /= 2.0
+        confidence = float(np.clip(float(np.max(local)) / max(float(corr[0]), 1e-9), 0.0, 1.0))
         return bpm, confidence
 
     def _report_error(self, message: str) -> None:
