@@ -111,7 +111,11 @@ class LivePanel(QWidget):
         if device is None:
             self.log_message.emit("No hay dispositivo de entrada disponible.")
             return
-        self.analyzer = LiveBpmAnalyzer(device=device, callback=self.update_live_metrics)
+        self.analyzer = LiveBpmAnalyzer(
+            device=device,
+            callback=self.update_live_metrics,
+            error_callback=self.log_message.emit,
+        )
         try:
             self.analyzer.start()
         except Exception as exc:

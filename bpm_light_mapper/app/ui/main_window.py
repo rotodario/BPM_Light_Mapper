@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from bpm_light_mapper.app.audio.loader import load_audio
 from bpm_light_mapper.app.audio.offline_analyzer import OfflineAnalysisParameters, analyze_file
 from bpm_light_mapper.app.export.export_csv import export_segments_csv, export_segments_txt
 from bpm_light_mapper.app.export.export_json import export_analysis_json
@@ -209,10 +210,28 @@ class MainWindow(QMainWindow):
         )
         if not file_path:
             return
-        self.current_file = file_path
-        self.file_info.setText(f"Archivo: {Path(file_path).name}")
-        self.analyze_button.setEnabled(True)
-        self.log(f"Archivo cargado: {file_path}")
+        try:
+            self.current_file = file_path
+            self.log(f"Archivo cargado: {file_path}")
+            self.log("Cargando waveform de previsualizacion...")
+            audio = load_audio(file_path, target_sr=22050)
+            self.current_audio = audio
+            self.analysis_result = None
+            self.waveform_widget.set_waveform(audio["waveform"], audio["duration"])
+            self.waveform_widget.set_beats([])
+            self.waveform_widget.set_segments([])
+            self.segment_table.load_segments([])
+            self.file_info.setText(
+                f"Archivo: {Path(file_path).name} | Duracion: {audio['duration']:.2f}s | "
+                f"SR: {audio['sample_rate']} | Canales: {audio['channels']}"
+            )
+            self.global_bpm_label.setText("BPM Global: analizando...")
+            self.zone_bpm_label.setText("Zona: -")
+            self.analyze_button.setEnabled(True)
+            self.start_analysis()
+        except Exception as exc:
+            QMessageBox.critical(self, "Error al cargar audio", str(exc))
+            self.log(f"Error al cargar audio: {exc}")
 
     def start_analysis(self) -> None:
         if not self.current_file:
