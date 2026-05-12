@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QPlainTextEdit,
     QSplitter,
@@ -20,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from bpm_light_mapper.app.audio.loader import load_audio
+from bpm_light_mapper.app.audio.loader import load_audio_preview
 from bpm_light_mapper.app.audio.offline_analyzer import OfflineAnalysisParameters, analyze_file
 from bpm_light_mapper.app.export.export_csv import export_segments_csv, export_segments_txt
 from bpm_light_mapper.app.export.export_json import export_analysis_json
@@ -35,6 +37,7 @@ from bpm_light_mapper.app.utils.logging_utils import timestamped
 class AnalysisThread(QThread):
     finished_ok = Signal(dict, object)
     failed = Signal(str)
+    progress = Signal(str)
 
     def __init__(self, file_path: str, params: OfflineAnalysisParameters) -> None:
         super().__init__()
@@ -43,8 +46,25 @@ class AnalysisThread(QThread):
 
     def run(self) -> None:
         try:
-            audio, result = analyze_file(self.file_path, self.params)
+            audio, result = analyze_file(self.file_path, self.params, progress_callback=self.progress.emit)
             self.finished_ok.emit(audio, result)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class AudioLoadThread(QThread):
+    finished_ok = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(self, file_path: str, target_sr: int = 22050) -> None:
+        super().__init__()
+        self.file_path = file_path
+        self.target_sr = target_sr
+
+    def run(self) -> None:
+        try:
+            audio = load_audio_preview(self.file_path, max_points=6000)
+            self.finished_ok.emit(audio)
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -57,8 +77,10 @@ class MainWindow(QMainWindow):
         self.current_file: str | None = None
         self.current_audio: dict | None = None
         self.analysis_result: AnalysisResult | None = None
+        self.audio_load_thread: AudioLoadThread | None = None
         self.analysis_thread: AnalysisThread | None = None
         self.beat_offset_applied = 0.0
+        self.busy_state = "idle"
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -97,6 +119,15 @@ class MainWindow(QMainWindow):
         info_row.addWidget(self.global_bpm_label, 1)
         info_row.addWidget(self.zone_bpm_label, 1)
         main_layout.addLayout(info_row)
+
+        status_row = QHBoxLayout()
+        self.status_label = QLabel("Estado: listo")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(False)
+        status_row.addWidget(self.status_label, 1)
+        status_row.addWidget(self.progress_bar, 2)
+        main_layout.addLayout(status_row)
 
         splitter = QSplitter()
         main_layout.addWidget(splitter, 1)
@@ -198,6 +229,18 @@ class MainWindow(QMainWindow):
         ]:
             button.setEnabled(enabled)
 
+    def _set_busy(self, busy: bool, state: str, message: str) -> None:
+        self.busy_state = state if busy else "idle"
+        self.progress_bar.setVisible(busy)
+        self.status_label.setText(f"Estado: {message}")
+        self.load_button.setEnabled(not busy)
+        self.analyze_button.setEnabled(not busy and self.current_file is not None)
+        self.live_panel.setEnabled(not busy)
+        if busy:
+            self._set_buttons_enabled(False)
+        elif self.analysis_result is not None:
+            self._set_buttons_enabled(True)
+
     def log(self, message: str) -> None:
         self.log_box.appendPlainText(timestamped(message))
 
@@ -210,46 +253,70 @@ class MainWindow(QMainWindow):
         )
         if not file_path:
             return
-        try:
-            self.current_file = file_path
-            self.log(f"Archivo cargado: {file_path}")
-            self.log("Cargando waveform de previsualizacion...")
-            audio = load_audio(file_path, target_sr=22050)
-            self.current_audio = audio
-            self.analysis_result = None
-            self.waveform_widget.set_waveform(audio["waveform"], audio["duration"])
-            self.waveform_widget.set_beats([])
-            self.waveform_widget.set_segments([])
-            self.segment_table.load_segments([])
-            self.file_info.setText(
-                f"Archivo: {Path(file_path).name} | Duracion: {audio['duration']:.2f}s | "
-                f"SR: {audio['sample_rate']} | Canales: {audio['channels']}"
-            )
-            self.global_bpm_label.setText("BPM Global: analizando...")
-            self.zone_bpm_label.setText("Zona: -")
-            self.analyze_button.setEnabled(True)
-            self.start_analysis()
-        except Exception as exc:
-            QMessageBox.critical(self, "Error al cargar audio", str(exc))
-            self.log(f"Error al cargar audio: {exc}")
+        self.current_file = file_path
+        self.current_audio = None
+        self.analysis_result = None
+        self.file_info.setText(f"Archivo: {Path(file_path).name}")
+        self.global_bpm_label.setText("BPM Global: -")
+        self.zone_bpm_label.setText("Zona: -")
+        self.waveform_widget.set_waveform([], 0.0)
+        self.segment_table.load_segments([])
+        self.log(f"Archivo cargado: {file_path}")
+        self.log("Cargando waveform de previsualizacion...")
+        self._set_busy(True, "loading", "cargando audio...")
+        self.audio_load_thread = AudioLoadThread(file_path)
+        self.audio_load_thread.finished_ok.connect(self.on_audio_loaded)
+        self.audio_load_thread.failed.connect(self.on_audio_load_failed)
+        self.audio_load_thread.finished.connect(self._on_audio_load_thread_finished)
+        self.audio_load_thread.start()
+
+    def on_audio_loaded(self, audio: dict) -> None:
+        self.current_audio = audio
+        self.waveform_widget.set_waveform(audio["waveform"], audio["duration"])
+        self.waveform_widget.set_beats([])
+        self.waveform_widget.set_segments([])
+        self.segment_table.load_segments([])
+        self.file_info.setText(
+            f"Archivo: {Path(audio['file_name']).name} | Duracion: {audio['duration']:.2f}s | "
+            f"SR: {audio['sample_rate']} | Canales: {audio['channels']}"
+        )
+        self.global_bpm_label.setText("BPM Global: analizando...")
+        self.zone_bpm_label.setText("Zona: -")
+        self.log("Waveform cargado. Iniciando analisis offline...")
+        self.start_analysis()
+
+    def on_audio_load_failed(self, error: str) -> None:
+        self._set_busy(False, "idle", "error de carga")
+        QMessageBox.critical(self, "Error al cargar audio", error)
+        self.log(f"Error al cargar audio: {error}")
 
     def start_analysis(self) -> None:
         if not self.current_file:
             return
-        self.analyze_button.setEnabled(False)
+        self._set_busy(True, "analysis", "analizando BPM...")
         self.log("Analisis offline iniciado.")
         self.analysis_thread = AnalysisThread(self.current_file, self._analysis_params())
         self.analysis_thread.finished_ok.connect(self.on_analysis_complete)
         self.analysis_thread.failed.connect(self.on_analysis_failed)
+        self.analysis_thread.progress.connect(self.on_analysis_progress)
+        self.analysis_thread.finished.connect(self._on_analysis_thread_finished)
         self.analysis_thread.start()
+
+    def on_analysis_progress(self, message: str) -> None:
+        self.status_label.setText(f"Estado: {message}")
+
+    def _on_audio_load_thread_finished(self) -> None:
+        self.audio_load_thread = None
+
+    def _on_analysis_thread_finished(self) -> None:
+        self.analysis_thread = None
 
     def on_analysis_complete(self, audio: dict, result: AnalysisResult) -> None:
         self.current_audio = audio
         self.analysis_result = result
         self.beat_offset_applied = 0.0
         self.beat_offset_spin.setValue(0.0)
-        self.analyze_button.setEnabled(True)
-        self._set_buttons_enabled(True)
+        self._set_busy(False, "idle", "listo")
         self.file_info.setText(
             f"Archivo: {result.file_name} | Duracion: {result.duration:.2f}s | "
             f"SR: {result.sample_rate} | Canales: {result.channels}"
@@ -293,7 +360,7 @@ class MainWindow(QMainWindow):
         self.log(f"Offset de beats aplicado: {new_offset:+.3f}s")
 
     def on_analysis_failed(self, error: str) -> None:
-        self.analyze_button.setEnabled(True)
+        self._set_busy(False, "idle", "error de analisis")
         QMessageBox.critical(self, "Error de analisis", error)
         self.log(f"Error de analisis: {error}")
 
@@ -411,3 +478,23 @@ class MainWindow(QMainWindow):
             return
         export_segments_txt(self.analysis_result, path)
         self.log(f"Exportado TXT: {path}")
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self.status_label.setText("Estado: cerrando...")
+        self.live_panel.stop_live()
+
+        if self.audio_load_thread is not None and self.audio_load_thread.isRunning():
+            self.audio_load_thread.wait(5000)
+            if self.audio_load_thread.isRunning():
+                self.log("Cierre cancelado: la carga de audio sigue activa.")
+                event.ignore()
+                return
+
+        if self.analysis_thread is not None and self.analysis_thread.isRunning():
+            self.analysis_thread.wait(5000)
+            if self.analysis_thread.isRunning():
+                self.log("Cierre cancelado: el analisis offline sigue activo.")
+                event.ignore()
+                return
+
+        event.accept()

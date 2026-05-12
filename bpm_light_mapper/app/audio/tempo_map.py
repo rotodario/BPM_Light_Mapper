@@ -30,12 +30,34 @@ def _window_confidence(onset_env: np.ndarray, beat_times: np.ndarray, bpm: float
     return float(np.clip(0.6 * regularity + 0.4 * energy, 0.0, 1.0))
 
 
+def _estimate_local_bpm_from_beats(
+    beat_times: np.ndarray,
+    bpm_min: float,
+    bpm_max: float,
+) -> float | None:
+    if len(beat_times) < 4:
+        return None
+    intervals = np.diff(beat_times)
+    if len(intervals) == 0:
+        return None
+    median_interval = float(np.median(intervals))
+    if median_interval <= 0:
+        return None
+    bpm = 60.0 / median_interval
+    while bpm < bpm_min and bpm > 0:
+        bpm *= 2.0
+    while bpm > bpm_max:
+        bpm /= 2.0
+    return float(np.clip(bpm, bpm_min, bpm_max))
+
+
 def generate_tempo_map(
     waveform: np.ndarray,
     sample_rate: int,
     beat_times: np.ndarray,
     onset_envelope: np.ndarray,
     params: TempoMapParameters,
+    progress_callback=None,
 ) -> list[Segment]:
     duration = len(waveform) / sample_rate
     if duration <= 0:
@@ -43,6 +65,8 @@ def generate_tempo_map(
 
     times = librosa.times_like(onset_envelope, sr=sample_rate, hop_length=512)
     windows: list[dict] = []
+    total_windows = max(1, int(np.ceil(duration / max(params.hop_seconds, 1e-9))))
+    window_index = 0
     start = 0.0
     while start < duration:
         end = min(duration, start + params.window_seconds)
@@ -51,15 +75,17 @@ def generate_tempo_map(
         local_beats = beat_times[beat_mask]
         if mask.sum() >= 4 and len(local_beats) >= 4:
             local_env = onset_envelope[mask]
-            tempo = librosa.feature.tempo(
-                onset_envelope=local_env,
-                sr=sample_rate,
-                hop_length=512,
-                aggregate=np.median,
-                max_tempo=params.bpm_max,
-            )
-            bpm = float(np.atleast_1d(tempo)[0])
-            bpm = float(np.clip(bpm, params.bpm_min, params.bpm_max))
+            bpm = _estimate_local_bpm_from_beats(local_beats, params.bpm_min, params.bpm_max)
+            if bpm is None:
+                tempo = librosa.feature.tempo(
+                    onset_envelope=local_env,
+                    sr=sample_rate,
+                    hop_length=512,
+                    aggregate=np.median,
+                    max_tempo=params.bpm_max,
+                )
+                bpm = float(np.atleast_1d(tempo)[0])
+                bpm = float(np.clip(bpm, params.bpm_min, params.bpm_max))
             confidence = _window_confidence(local_env, local_beats, bpm)
             windows.append(
                 {
@@ -70,6 +96,9 @@ def generate_tempo_map(
                     "beats": local_beats.tolist(),
                 }
             )
+        window_index += 1
+        if progress_callback is not None and window_index % 10 == 0:
+            progress_callback(f"segmentando zonas... ventana {window_index}/{total_windows}")
         start += params.hop_seconds
 
     if not windows:

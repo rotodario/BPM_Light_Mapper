@@ -39,11 +39,37 @@ def _bpm_candidates(bpm: float, bpm_min: float, bpm_max: float) -> list[float]:
     return sorted(values)
 
 
-def analyze_file(file_path: str, params: OfflineAnalysisParameters) -> tuple[dict, AnalysisResult]:
+def _estimate_global_bpm_from_beats(
+    beat_times: np.ndarray,
+    fallback_bpm: float,
+    bpm_min: float,
+    bpm_max: float,
+) -> float:
+    if len(beat_times) < 4:
+        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
+    intervals = np.diff(beat_times)
+    if len(intervals) == 0:
+        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
+    median_interval = float(np.median(intervals))
+    if median_interval <= 0:
+        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
+    bpm = 60.0 / median_interval
+    while bpm < bpm_min and bpm > 0:
+        bpm *= 2.0
+    while bpm > bpm_max:
+        bpm /= 2.0
+    return float(np.clip(bpm, bpm_min, bpm_max))
+
+
+def analyze_file(file_path: str, params: OfflineAnalysisParameters, progress_callback=None) -> tuple[dict, AnalysisResult]:
+    if progress_callback is not None:
+        progress_callback("cargando audio completo...")
     audio = load_audio(file_path, target_sr=params.target_sr)
     waveform = audio["waveform"]
     sample_rate = audio["sample_rate"]
 
+    if progress_callback is not None:
+        progress_callback("detectando beats...")
     bpm_global, beat_times, onset_envelope, onset_times = detect_beats(
         waveform,
         sample_rate,
@@ -53,16 +79,14 @@ def analyze_file(file_path: str, params: OfflineAnalysisParameters) -> tuple[dic
     )
     onset_envelope = onset_envelope * params.onset_sensitivity
 
-    global_tempo_dist = librosa.feature.tempo(
-        onset_envelope=onset_envelope,
-        sr=sample_rate,
-        hop_length=params.hop_length,
-        aggregate=None,
-        max_tempo=params.bpm_max,
+    if progress_callback is not None:
+        progress_callback("estimando BPM global...")
+    bpm_global = _estimate_global_bpm_from_beats(
+        beat_times,
+        bpm_global,
+        params.bpm_min,
+        params.bpm_max,
     )
-    if len(global_tempo_dist):
-        bpm_global = float(np.median(global_tempo_dist))
-    bpm_global = float(np.clip(bpm_global, params.bpm_min, params.bpm_max))
 
     confidence_global = beat_consistency_confidence(beat_times, bpm_global)
     warnings: list[str] = []
@@ -79,12 +103,15 @@ def analyze_file(file_path: str, params: OfflineAnalysisParameters) -> tuple[dic
         bpm_min=params.bpm_min,
         bpm_max=params.bpm_max,
     )
+    if progress_callback is not None:
+        progress_callback("segmentando zonas BPM...")
     segments = generate_tempo_map(
         waveform,
         sample_rate,
         beat_times,
         onset_envelope,
         map_params,
+        progress_callback=progress_callback,
     )
 
     result = AnalysisResult(
