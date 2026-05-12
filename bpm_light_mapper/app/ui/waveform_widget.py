@@ -109,7 +109,9 @@ class WaveformWidget(QWidget):
             region.setBrush(color)
             pen_color = color
             pen_color.setAlpha(220 if idx == index else 115)
-            region.setPen(pg.mkPen(pen_color, width=2 if idx == index else 1))
+            pen = pg.mkPen(pen_color, width=2 if idx == index else 1)
+            for line in region.lines:
+                line.setPen(pen)
             if idx < len(self.segment_labels):
                 self.segment_labels[idx].setColor(COLORS["cyan"] if idx == index else COLORS["text"])
 

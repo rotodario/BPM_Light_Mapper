@@ -12,39 +12,29 @@
 - segment table editing
 - add/delete/split/merge segment actions
 - manual beat offset application
+- embedded playback transport with play/stop
+- waveform playhead and click-to-seek navigation
+- bidirectional selection between waveform position and segment table
 - JSON/CSV/TXT export
 - live device listing
 - live BPM estimation with rolling history
 - live confidence and state labels
 - tap tempo and manual lock
+- dark HUD UI theme for offline and live operation
+- application logging for analysis and live diagnostics
 - synthetic test generator script
 
 ## Not Implemented Yet
 
-- playback transport
 - click/metronome preview
 - draggable segment boundary editing
 - explicit beat audition
 - persistent project save/load
 - advanced confidence diagnostics UI
 
-## Environment Constraints Encountered
+## Current Focus
 
-- UI dependencies were not installed in the current execution environment
-- synthetic validation could not be executed here because directory creation was denied by the sandbox
-- `git init` also needs elevated permission in this environment
-
-## Repo Preparation
-
-Prepared for repository setup:
-
-- `.gitignore` added
-- documentation skeleton added
-- code organized for first commit
-
-When GitHub URL is available, the remaining steps are:
-
-1. initialize local git repository
-2. create first commit
-3. add remote
-4. push selected branch
+- reduce analysis stalls on long or unusual audio
+- keep UI responsive while loading, analyzing and running live input
+- improve waveform/timeline editing ergonomics
+- add stronger diagnostics so failures are visible in logs instead of guesswork

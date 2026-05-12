@@ -102,6 +102,7 @@ class MainWindow(QMainWindow):
         self.beat_offset_applied = 0.0
         self.busy_state = "idle"
         self.is_closing = False
+        self.selecting_from_waveform = False
         self.audio_output = QAudioOutput()
         self.audio_output.setVolume(0.85)
         self.player = QMediaPlayer()
@@ -179,18 +180,45 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        splitter = QSplitter()
-        splitter.setChildrenCollapsible(False)
-        layout.addWidget(splitter, 1)
+        metrics_panel = SectionPanel("Indicadores")
+        metrics_grid = QGridLayout()
+        metrics_grid.setSpacing(10)
+        metrics_grid.setColumnStretch(0, 1)
+        metrics_grid.setColumnStretch(1, 1)
+        metrics_grid.setColumnStretch(2, 1)
+        metrics_grid.setColumnStretch(3, 1)
+        self.global_bpm_card = MetricCard("BPM Global", "-")
+        self.zone_bpm_card = MetricCard("BPM Zona", "-")
+        self.confidence_card = MetricCard("Confidence", "-", compact=True)
+        self.beat_ms_card = MetricCard("Beat ms", "-", compact=True)
+        self.candidates_card = MetricCard("Half / Double", "-", compact=True)
+        self.zone_count_card = MetricCard("Zonas", "-", compact=True)
+        self.duration_card = MetricCard("Duracion", "-", compact=True)
+        self.current_zone_card = MetricCard("Zona Actual", "-", compact=True)
+        metrics_grid.addWidget(self.global_bpm_card, 0, 0)
+        metrics_grid.addWidget(self.zone_bpm_card, 0, 1)
+        metrics_grid.addWidget(self.confidence_card, 0, 2)
+        metrics_grid.addWidget(self.beat_ms_card, 0, 3)
+        metrics_grid.addWidget(self.candidates_card, 1, 0)
+        metrics_grid.addWidget(self.zone_count_card, 1, 1)
+        metrics_grid.addWidget(self.duration_card, 1, 2)
+        metrics_grid.addWidget(self.current_zone_card, 1, 3)
+        metrics_panel.body.addLayout(metrics_grid)
+        metrics_panel.setMaximumHeight(190)
+        layout.addWidget(metrics_panel)
+
+        left_splitter = QSplitter()
+        left_splitter.setOrientation(Qt.Vertical)
+        left_splitter.setChildrenCollapsible(False)
+
+        content_splitter = QSplitter()
+        content_splitter.setChildrenCollapsible(False)
+        layout.addWidget(content_splitter, 1)
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
-
-        left_splitter = QSplitter()
-        left_splitter.setOrientation(Qt.Vertical)
-        left_splitter.setChildrenCollapsible(False)
         left_layout.addWidget(left_splitter, 1)
 
         waveform_area = QWidget()
@@ -239,41 +267,19 @@ class MainWindow(QMainWindow):
 
         self.log_box = QPlainTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setMaximumHeight(110)
+        self.log_box.setMaximumHeight(95)
         bottom_layout.addWidget(self.log_box)
         left_splitter.addWidget(bottom_area)
-        left_splitter.setSizes([520, 300])
+        left_splitter.setStretchFactor(0, 1)
+        left_splitter.setStretchFactor(1, 2)
+        left_splitter.setSizes([260, 520])
 
         right = QWidget()
-        right.setMinimumWidth(420)
-        right.setMaximumWidth(540)
+        right.setMinimumWidth(360)
+        right.setMaximumWidth(470)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
-
-        metrics_panel = SectionPanel("Indicadores")
-        metrics_grid = QGridLayout()
-        metrics_grid.setSpacing(10)
-        metrics_grid.setColumnMinimumWidth(0, 170)
-        metrics_grid.setColumnMinimumWidth(1, 170)
-        self.global_bpm_card = MetricCard("BPM Global", "-")
-        self.zone_bpm_card = MetricCard("BPM Zona", "-")
-        self.confidence_card = MetricCard("Confidence", "-", compact=True)
-        self.beat_ms_card = MetricCard("Beat ms", "-", compact=True)
-        self.candidates_card = MetricCard("Half / Double", "-", compact=True)
-        self.zone_count_card = MetricCard("Zonas", "-", compact=True)
-        self.duration_card = MetricCard("Duracion", "-", compact=True)
-        self.current_zone_card = MetricCard("Zona Actual", "-", compact=True)
-        metrics_grid.addWidget(self.global_bpm_card, 0, 0, 1, 2)
-        metrics_grid.addWidget(self.zone_bpm_card, 1, 0, 1, 2)
-        metrics_grid.addWidget(self.confidence_card, 2, 0)
-        metrics_grid.addWidget(self.beat_ms_card, 2, 1)
-        metrics_grid.addWidget(self.candidates_card, 3, 0, 1, 2)
-        metrics_grid.addWidget(self.zone_count_card, 4, 0)
-        metrics_grid.addWidget(self.duration_card, 4, 1)
-        metrics_grid.addWidget(self.current_zone_card, 5, 0, 1, 2)
-        metrics_panel.body.addLayout(metrics_grid)
-        right_layout.addWidget(metrics_panel)
 
         timing_panel = SectionPanel("Timing")
         self.offline_timing_grid = TimingGrid()
@@ -291,14 +297,15 @@ class MainWindow(QMainWindow):
         export_panel.body.addLayout(export_row)
         right_layout.addWidget(export_panel)
 
-        right_layout.addWidget(self._build_params_box())
+        advanced_box = self._build_params_box()
+        right_layout.addWidget(advanced_box)
         right_layout.addStretch(1)
 
-        splitter.addWidget(left)
-        splitter.addWidget(right)
-        splitter.setStretchFactor(0, 5)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([1050, 430])
+        content_splitter.addWidget(left)
+        content_splitter.addWidget(right)
+        content_splitter.setStretchFactor(0, 5)
+        content_splitter.setStretchFactor(1, 1)
+        content_splitter.setSizes([1120, 390])
         return tab
 
     def _build_params_box(self) -> QGroupBox:
@@ -625,6 +632,11 @@ class MainWindow(QMainWindow):
             self.player.setSource(QUrl.fromLocalFile(self.current_file))
         self.player.setPosition(int(max(0.0, seconds) * 1000))
         self.position_label.setText(self._format_position_ms(int(seconds * 1000)))
+        self.selecting_from_waveform = True
+        try:
+            self.select_segment_at_time(seconds)
+        finally:
+            self.selecting_from_waveform = False
 
     def on_player_position_changed(self, milliseconds: int) -> None:
         seconds = milliseconds / 1000.0
@@ -638,6 +650,8 @@ class MainWindow(QMainWindow):
         if self.analysis_result is None or row < 0 or row >= len(self.analysis_result.segments):
             return
         segment = self.analysis_result.segments[row]
+        if not self.selecting_from_waveform:
+            self.seek_to_segment_start(segment)
         beat_ms = 60000.0 / segment.bpm if segment.bpm > 0 else 0.0
         self.zone_bpm_card.set_value(f"{segment.bpm:.2f}", f"{segment.start:.2f}s - {segment.end:.2f}s")
         self.zone_bpm_card.set_accent(COLORS["green"] if segment.confirmed else COLORS["cyan"])
@@ -648,6 +662,24 @@ class MainWindow(QMainWindow):
         self.beat_ms_card.set_value(f"{beat_ms:.2f}", "ms zona actual")
         self.offline_timing_grid.set_beat_ms(beat_ms)
         self.waveform_widget.highlight_segment(row)
+
+    def seek_to_segment_start(self, segment: Segment) -> None:
+        seconds = max(0.0, min(segment.start, self.analysis_result.duration if self.analysis_result else segment.start))
+        self.waveform_widget.set_playhead(seconds)
+        self.position_label.setText(self._format_position_ms(int(seconds * 1000)))
+        if self.current_file and self.player.source().isEmpty():
+            self.player.setSource(QUrl.fromLocalFile(self.current_file))
+        self.player.setPosition(int(seconds * 1000))
+
+    def select_segment_at_time(self, seconds: float) -> None:
+        if self.analysis_result is None:
+            return
+        for index, segment in enumerate(self.analysis_result.segments):
+            if segment.start <= seconds <= segment.end:
+                if self.segment_table.currentRow() != index:
+                    self.segment_table.selectRow(index)
+                self.waveform_widget.highlight_segment(index)
+                return
 
     def refresh_segment_view(self) -> None:
         if self.analysis_result is None:

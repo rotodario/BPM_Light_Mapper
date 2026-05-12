@@ -82,12 +82,17 @@ bpm_light_mapper/
   - file loading
   - launching analysis in a worker thread
   - segment editing actions
+  - playback transport and playhead synchronization
+  - waveform/table segment selection coordination
   - export actions
 
 - `waveform_widget.py`
   - waveform display
   - beat markers
   - segment overlays
+  - BPM labels per zone
+  - click-to-seek signal emission
+  - selected-segment highlighting
 
 - `segment_table.py`
   - editable table for segment start/end/BPM/notes/confirmation
@@ -98,6 +103,14 @@ bpm_light_mapper/
   - tap tempo
   - manual lock
   - useful beat-duration subdivisions in ms
+
+- `theme.py`
+  - central dark HUD palette
+  - global QSS for Qt widgets
+  - shared style helpers for status and action controls
+
+- `metric_card.py`, `status_badge.py`, `section_panel.py`, `timing_grid.py`
+  - reusable HUD components for prominent BPM, confidence, status and timing displays
 
 ### `app/export`
 
@@ -123,8 +136,10 @@ bpm_light_mapper/
 5. `tempo_map.py` derives local BPM windows and merges them into segments.
 6. `AnalysisResult` is sent back to the UI thread.
 7. UI renders waveform, beat markers and segments.
-8. User edits segments manually if needed.
-9. Export modules write JSON/CSV/TXT.
+8. User navigates with waveform clicks or segment table selection.
+9. Playback playhead, selected zone and table row stay synchronized.
+10. User edits segments manually if needed.
+11. Export modules write JSON/CSV/TXT.
 
 ### Live
 
@@ -163,18 +178,18 @@ Because of this, manual correction is a first-class feature rather than an after
 
 ## Current Limitations
 
-- no embedded audio playback yet
 - no click/metronome overlay yet
 - no direct drag editing of segment boundaries on the waveform yet
 - live mode is useful but still basic
 - no beat-grid snapping tools yet
 - no dedicated persistence format for manual edit history yet
+- playback depends on codecs available to Qt Multimedia on the host machine
 
 ## Planned Direction
 
 Near-term direction:
 
-- playback and click preview
+- click preview
 - stronger segment editing UX
 - better live lock behavior
 - improved synthetic validation

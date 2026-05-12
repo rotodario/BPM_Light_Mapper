@@ -28,8 +28,12 @@ Typical use cases:
    - confidence
    - beat markers
    - detected tempo segments
-8. Edit segments manually if needed.
-9. Export the result to JSON, CSV or TXT.
+8. Use the waveform playhead to inspect positions:
+   - click on the waveform to move playback to that time
+   - the matching segment is selected in the table
+   - selecting a row in the segment table moves the playhead to that zone
+9. Edit segments manually if needed.
+10. Export the result to JSON, CSV or TXT.
 
 ### Live Analysis
 
@@ -114,6 +118,27 @@ Recommended use:
 - confirm the sections you trust
 - annotate musical structure such as `intro`, `drop`, `break`, `solo`, `final`
 
+## Waveform and Timeline Navigation
+
+The waveform is the main offline workspace.
+
+What it shows:
+
+- audio amplitude in cyan
+- beat markers as thin vertical lines
+- tempo zones as translucent regions
+- BPM labels inside each detected zone
+- a red playhead for the current playback/inspection position
+
+Navigation behavior:
+
+- clicking the waveform moves the playhead and selects the segment at that time
+- selecting a segment row moves the playhead to that segment start
+- the selected segment is highlighted on the waveform
+- `Play` and `Stop` control the loaded audio when the local Qt multimedia backend supports the file codec
+
+If playback does not start for an MP3 or other compressed file, the analysis can still work; install suitable codecs or test with WAV/FLAC for the most predictable playback path.
+
 ## Beat Offset
 
 If the first detected beat is not where the real downbeat should be:
@@ -181,3 +206,4 @@ For live:
 - sparse intros and atmospheric sections reduce confidence
 - live mode is helpful but should not replace operator judgement
 - swing and tempo ramps need careful review
+- click/metronome audition is not implemented yet

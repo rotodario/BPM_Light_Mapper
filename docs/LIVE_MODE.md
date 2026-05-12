@@ -23,6 +23,8 @@ It should help an operator answer:
 - tap tempo
 - manual tap lock
 - beat-length subdivisions in ms
+- dark HUD panel optimized for visibility from a control position
+- non-blocking live startup so device errors should return to the UI instead of freezing it
 
 ## Detection States
 
@@ -139,6 +141,7 @@ Example at 128 BPM:
 - breakdowns and ambience reduce confidence
 - half-time vs double-time ambiguity still exists
 - detection quality depends strongly on the selected input signal
+- device drivers can still fail or block at OS/backend level; app logs are the first place to inspect these cases
 
 ## Good Input Sources
 
@@ -160,3 +163,4 @@ Avoid if possible:
 - better lock retention logic
 - more explicit live ambiguity warnings
 - optional export or network hooks for external lighting tools
+- lower-level backend diagnostics per audio device
