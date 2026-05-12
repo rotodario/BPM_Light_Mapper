@@ -8,7 +8,7 @@
 - global BPM estimation
 - beat detection
 - local BPM window analysis
-- basic tempo-zone segmentation
+- tempo-zone segmentation with contiguous non-overlapping boundaries
 - segment table editing
 - add/delete/split/merge segment actions
 - manual beat offset application
@@ -21,8 +21,11 @@
 - live confidence and state labels
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
+- dark styled dropdowns for test loading and live input selection
 - application logging for analysis and live diagnostics
 - synthetic test generator script
+- committed synthetic audio fixtures and validation runner
+- Markdown BPM validation report generation
 
 ## Not Implemented Yet
 
@@ -37,4 +40,4 @@
 - reduce analysis stalls on long or unusual audio
 - keep UI responsive while loading, analyzing and running live input
 - improve waveform/timeline editing ergonomics
-- add stronger diagnostics so failures are visible in logs instead of guesswork
+- expand validation from synthetic fixtures toward real show-track regression cases

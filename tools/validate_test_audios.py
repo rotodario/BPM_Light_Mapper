@@ -152,6 +152,16 @@ def _detect_false_segments_in_silence(test: dict[str, Any], detected: list[Segme
     return false_segments
 
 
+def _detect_segment_overlaps(detected: list[SegmentSummary]) -> list[tuple[SegmentSummary, SegmentSummary, float]]:
+    overlaps = []
+    ordered = sorted(detected, key=lambda segment: (segment.start, segment.end))
+    for left, right in zip(ordered, ordered[1:]):
+        overlap = left.end - right.start
+        if overlap > 0.05:
+            overlaps.append((left, right, overlap))
+    return overlaps
+
+
 def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
     expected_bpm = test.get("global_bpm")
     if expected_bpm is None and "alternate_bpm" in test and test.get("alternate_bpm") is not None:
@@ -164,6 +174,11 @@ def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
     detected_segments = _segment_summaries_from_detected(result)
     notes: list[str] = []
     passed = True
+    overlaps = _detect_segment_overlaps(detected_segments)
+    if overlaps:
+        passed = False
+        total_overlap = sum(overlap for _, _, overlap in overlaps)
+        notes.append(f"{len(overlaps)} overlapping segment boundaries ({total_overlap:.2f}s total)")
 
     file_name = test["file"]
     description = test.get("description", file_name)

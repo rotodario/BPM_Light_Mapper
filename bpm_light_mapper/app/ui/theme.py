@@ -116,6 +116,35 @@ QPushButton[role="danger"] {{
     border-color: #7d263b;
 }}
 
+QPushButton::menu-indicator {{
+    image: none;
+    width: 0px;
+}}
+
+QMenu {{
+    background: {COLORS["panel_alt"]};
+    color: {COLORS["text"]};
+    border: 1px solid {COLORS["panel_edge"]};
+    border-radius: 7px;
+    padding: 6px;
+}}
+
+QMenu::item {{
+    background: transparent;
+    color: {COLORS["text"]};
+    padding: 8px 24px 8px 12px;
+    border-radius: 5px;
+}}
+
+QMenu::item:selected {{
+    background: #123647;
+    color: {COLORS["cyan"]};
+}}
+
+QMenu::item:disabled {{
+    color: #5a6875;
+}}
+
 QGroupBox {{
     background: {COLORS["panel"]};
     border: 1px solid {COLORS["panel_edge"]};
@@ -213,11 +242,26 @@ QComboBox, QDoubleSpinBox {{
     border: 1px solid #26394c;
     border-radius: 6px;
     padding: 6px 8px;
+    color: {COLORS["text"]};
 }}
 
 QComboBox::drop-down {{
     border: 0;
     width: 22px;
+}}
+
+QComboBox QAbstractItemView {{
+    background: {COLORS["panel_alt"]};
+    color: {COLORS["text"]};
+    border: 1px solid {COLORS["panel_edge"]};
+    selection-background-color: #123647;
+    selection-color: {COLORS["cyan"]};
+    outline: 0;
+}}
+
+QComboBox QAbstractItemView::item {{
+    min-height: 28px;
+    padding: 6px 8px;
 }}
 
 QSplitter::handle {{

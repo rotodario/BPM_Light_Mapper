@@ -70,7 +70,7 @@
 ### Segments
 
 - Expected: 0.0-30.0s | 120.00 BPM | intro; 30.0-60.0s | 128.00 BPM | drop; 60.0-90.0s | 124.00 BPM | outro
-- Detected: 0.0-34.0s | 120.38 BPM | conf 0.61; 24.0-68.0s | 127.98 BPM | conf 0.61; 58.0-90.0s | 123.98 BPM | conf 0.61
+- Detected: 0.0-29.0s | 120.38 BPM | conf 0.61; 29.0-63.0s | 127.98 BPM | conf 0.61; 63.0-90.0s | 123.98 BPM | conf 0.61
 
 ## 05_128bpm_with_silence_breaks_75s.wav
 
@@ -114,7 +114,7 @@
 ### Segments
 
 - Expected: 0.0-60.0s | 124.00 BPM | gradual tempo ramp
-- Detected: 0.0-54.0s | 123.55 BPM | conf 0.61; 44.0-60.0s | 127.39 BPM | conf 0.61
+- Detected: 0.0-49.0s | 123.55 BPM | conf 0.61; 49.0-60.0s | 127.39 BPM | conf 0.61
 
 ## 08_waltz_3_4_90bpm_60s.wav
 

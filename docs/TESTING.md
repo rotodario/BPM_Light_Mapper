@@ -12,11 +12,23 @@ Main goals:
 
 ## Synthetic Validation
 
-Synthetic validation is implemented in:
+Primary fixture validation is implemented in:
+
+- [tools/validate_test_audios.py](/F:/Descargas/bpm_detec/tools/validate_test_audios.py:1)
+
+It loads committed WAV fixtures from:
+
+- [tests/audio/fixtures](/F:/Descargas/bpm_detec/tests/audio/fixtures/README_TEST_AUDIO.md:1)
+
+Ground truth lives in:
+
+- [tests/audio/fixtures/ground_truth.json](/F:/Descargas/bpm_detec/tests/audio/fixtures/ground_truth.json:1)
+
+The older generator is still available in:
 
 - [bpm_light_mapper/app/audio/synthetic_tests.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/synthetic_tests.py:1)
 
-It generates controlled audio material for repeatable checks.
+It generates controlled audio material for repeatable checks when new fixtures are needed.
 
 ## Current Test Cases
 
@@ -81,6 +93,19 @@ Expected:
 
 ## Running the Synthetic Tests
 
+Run the committed fixture validation:
+
+```bash
+python tools/validate_test_audios.py
+```
+
+Expected output:
+
+- console summary with pass/fail
+- Markdown report at `data/test_reports/bpm_validation_report.md`
+
+Run the generator-only script:
+
 ```bash
 python -m bpm_light_mapper.app.audio.synthetic_tests
 ```
@@ -97,6 +122,15 @@ Expected outputs:
 - `detected_segments`
 - `segment_bpms`
 - `warnings`
+
+The validation runner also checks:
+
+- click tracks stay within strict BPM thresholds
+- tempo-map fixtures detect at least 2 of 3 expected zones
+- detected zones do not overlap
+- silence fixtures do not create false fully-silent segments
+- half-time/double-time ambiguity is warned instead of hidden
+- low-onset material reports low confidence
 
 ## Manual Testing Checklist
 
@@ -137,5 +171,5 @@ Expected outputs:
 
 - no automated GUI tests yet
 - no benchmark dataset from real songs yet
-- no strict pass/fail thresholds committed yet
-- current synthetic tests still need execution in an environment with write permission
+- committed fixtures are synthetic, not a replacement for real show-track validation
+- report quality depends on the ground truth metadata staying current

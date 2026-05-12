@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -44,6 +45,7 @@ from bpm_light_mapper.app.utils.logging_utils import get_logger, timestamped
 
 
 BACKGROUND_THREADS: list[QThread] = []
+TEST_AUDIO_DIR = Path(__file__).resolve().parents[3] / "tests" / "audio" / "fixtures"
 
 
 class AnalysisThread(QThread):
@@ -162,6 +164,10 @@ class MainWindow(QMainWindow):
 
         self.load_button = QPushButton("Cargar Audio")
         self.load_button.setProperty("role", "primary")
+        self.test_audio_button = QPushButton("Cargar Test")
+        self.test_audio_menu = QMenu(self.test_audio_button)
+        self.test_audio_button.setMenu(self.test_audio_menu)
+        self.test_audio_menu.aboutToShow.connect(self._refresh_test_audio_menu)
         self.analyze_button = QPushButton("Analizar")
         self.live_nav_button = QPushButton("LIVE")
         self.live_nav_button.setProperty("role", "primary")
@@ -170,6 +176,7 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
         layout.addLayout(status_block, 2)
         layout.addWidget(self.load_button)
+        layout.addWidget(self.test_audio_button)
         layout.addWidget(self.analyze_button)
         layout.addWidget(self.live_nav_button)
         return header
@@ -207,10 +214,12 @@ class MainWindow(QMainWindow):
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         bottom_layout.setSpacing(10)
 
-        segment_metrics_splitter = QSplitter()
-        segment_metrics_splitter.setChildrenCollapsible(False)
-
         segment_panel = SectionPanel("Segmentos BPM")
+        segment_tabs = QTabWidget()
+        segments_tab = QWidget()
+        segments_layout = QVBoxLayout(segments_tab)
+        segments_layout.setContentsMargins(0, 0, 0, 0)
+        segments_layout.setSpacing(8)
         edit_row = QHBoxLayout()
         self.add_segment_button = QPushButton("Anadir zona")
         self.delete_segment_button = QPushButton("Borrar")
@@ -225,9 +234,20 @@ class MainWindow(QMainWindow):
             edit_row.addWidget(button)
         edit_row.addStretch(1)
         self.segment_table = SegmentTable()
-        segment_panel.body.addLayout(edit_row)
-        segment_panel.body.addWidget(self.segment_table)
-        segment_metrics_splitter.addWidget(segment_panel)
+        segments_layout.addLayout(edit_row)
+        segments_layout.addWidget(self.segment_table)
+
+        terminal_tab = QWidget()
+        terminal_layout = QVBoxLayout(terminal_tab)
+        terminal_layout.setContentsMargins(0, 0, 0, 0)
+        self.log_box = QPlainTextEdit()
+        self.log_box.setReadOnly(True)
+        terminal_layout.addWidget(self.log_box)
+
+        segment_tabs.addTab(segments_tab, "Segmentos")
+        segment_tabs.addTab(terminal_tab, "Terminal")
+        segment_panel.body.addWidget(segment_tabs)
+        bottom_layout.addWidget(segment_panel, 1)
 
         metrics_panel = SectionPanel("Indicadores")
         metrics_panel.setMinimumWidth(330)
@@ -253,29 +273,20 @@ class MainWindow(QMainWindow):
         metrics_grid.addWidget(self.duration_card, 4, 1)
         metrics_grid.addWidget(self.current_zone_card, 5, 0, 1, 2)
         metrics_panel.body.addLayout(metrics_grid)
-        segment_metrics_splitter.addWidget(metrics_panel)
-        segment_metrics_splitter.setStretchFactor(0, 4)
-        segment_metrics_splitter.setStretchFactor(1, 1)
-        segment_metrics_splitter.setSizes([780, 360])
-
-        bottom_layout.addWidget(segment_metrics_splitter, 1)
-
-        self.log_box = QPlainTextEdit()
-        self.log_box.setReadOnly(True)
-        self.log_box.setMaximumHeight(95)
-        bottom_layout.addWidget(self.log_box)
 
         right = QWidget()
-        right.setMinimumWidth(360)
-        right.setMaximumWidth(470)
+        right.setMinimumWidth(330)
+        right.setMaximumWidth(430)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
+        right_tabs = QTabWidget()
+
         timing_panel = SectionPanel("Timing")
         self.offline_timing_grid = TimingGrid()
         timing_panel.body.addWidget(self.offline_timing_grid)
-        right_layout.addWidget(timing_panel)
+        right_tabs.addTab(timing_panel, "Timing")
 
         export_panel = SectionPanel("Exportacion")
         export_row = QHBoxLayout()
@@ -286,17 +297,20 @@ class MainWindow(QMainWindow):
         export_row.addWidget(self.export_csv_button)
         export_row.addWidget(self.export_txt_button)
         export_panel.body.addLayout(export_row)
-        right_layout.addWidget(export_panel)
+        right_tabs.addTab(export_panel, "Exportacion")
 
         advanced_box = self._build_params_box()
-        right_layout.addWidget(advanced_box)
+        right_tabs.addTab(advanced_box, "Advanced")
+        right_layout.addWidget(right_tabs, 1)
         right_layout.addStretch(1)
 
         content_splitter.addWidget(bottom_area)
+        content_splitter.addWidget(metrics_panel)
         content_splitter.addWidget(right)
         content_splitter.setStretchFactor(0, 5)
         content_splitter.setStretchFactor(1, 1)
-        content_splitter.setSizes([1120, 390])
+        content_splitter.setStretchFactor(2, 1)
+        content_splitter.setSizes([850, 360, 360])
         return tab
 
     def _build_params_box(self) -> QGroupBox:
@@ -339,6 +353,28 @@ class MainWindow(QMainWindow):
         self.delete_segment_button.clicked.connect(self.delete_segment)
         self.split_segment_button.clicked.connect(self.split_segment)
         self.merge_segment_button.clicked.connect(self.merge_segment)
+
+    def _refresh_test_audio_menu(self) -> None:
+        self.test_audio_menu.clear()
+        if not TEST_AUDIO_DIR.exists():
+            action = self.test_audio_menu.addAction("No existe tests/audio/fixtures")
+            action.setEnabled(False)
+            return
+
+        audio_files = sorted(TEST_AUDIO_DIR.glob("*.wav"))
+        if not audio_files:
+            action = self.test_audio_menu.addAction("No hay WAV de test")
+            action.setEnabled(False)
+            return
+
+        for audio_path in audio_files:
+            label = audio_path.stem.replace("_", " ")
+            action = self.test_audio_menu.addAction(label)
+            action.setToolTip(str(audio_path))
+            action.triggered.connect(lambda checked=False, path=audio_path: self.load_test_audio(path))
+
+    def load_test_audio(self, audio_path: Path) -> None:
+        self._load_audio_path(str(audio_path))
 
     @staticmethod
     def _spin(minimum: float, maximum: float, value: float, step: float) -> QDoubleSpinBox:
@@ -414,6 +450,7 @@ class MainWindow(QMainWindow):
         badge_state = state.upper() if busy or state.upper() == "ERROR" else "IDLE"
         self._set_app_state(badge_state, message)
         self.load_button.setEnabled(not busy)
+        self.test_audio_button.setEnabled(not busy)
         self.analyze_button.setEnabled(not busy and self.current_file is not None)
         self.live_panel.setEnabled(not busy)
         if busy:
@@ -465,6 +502,9 @@ class MainWindow(QMainWindow):
         )
         if not file_path:
             return
+        self._load_audio_path(file_path)
+
+    def _load_audio_path(self, file_path: str) -> None:
         self.current_file = file_path
         self.current_audio = None
         self.analysis_result = None

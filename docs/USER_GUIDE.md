@@ -35,6 +35,18 @@ Typical use cases:
 9. Edit segments manually if needed.
 10. Export the result to JSON, CSV or TXT.
 
+For quick regression checks, use `Cargar Test` next to `Cargar Audio`.
+It opens a dropdown with the WAV fixtures from `tests/audio/fixtures` and loads the selected file through the same offline pipeline.
+
+### Offline Layout
+
+The offline workspace is intentionally compact:
+
+- the top area contains waveform, beat grid, tempo zones and playhead
+- the lower-left panel has tabs for `Segmentos` and `Terminal`
+- `Indicadores` stays in its own column for constant visibility
+- the right column has tabs for `Timing`, `Exportacion` and `Advanced`
+
 ### Live Analysis
 
 1. Open the `LIVE` tab.
@@ -128,6 +140,7 @@ What it shows:
 - beat markers as thin vertical lines
 - tempo zones as translucent regions
 - BPM labels inside each detected zone
+- non-overlapping tempo zones generated from contiguous analysis boundaries
 - a red playhead for the current playback/inspection position
 
 Navigation behavior:

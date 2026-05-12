@@ -88,6 +88,7 @@ def generate_tempo_map(
                 {
                     "start": start,
                     "end": end,
+                    "center": (start + end) / 2.0,
                     "bpm": bpm,
                     "confidence": confidence,
                     "beats": local_beats.tolist(),
@@ -108,8 +109,8 @@ def generate_tempo_map(
 
     segments: list[Segment] = []
     current = {
-        "start": windows[0]["start"],
-        "end": windows[0]["end"],
+        "first_window": 0,
+        "last_window": 0,
         "bpms": [float(smoothed_bpms[0])],
         "conf": [windows[0]["confidence"]],
         "beats": list(windows[0]["beats"]),
@@ -119,39 +120,55 @@ def generate_tempo_map(
         bpm = float(smoothed_bpms[idx])
         current_bpm = float(np.median(current["bpms"]))
         can_split = abs(bpm - current_bpm) >= params.min_bpm_change
-        long_enough = (current["end"] - current["start"]) >= params.min_segment_seconds
+        first_center = float(windows[int(current["first_window"])]["center"])
+        last_center = float(windows[int(current["last_window"])]["center"])
+        long_enough = (last_center - first_center + params.hop_seconds) >= params.min_segment_seconds
         if can_split and long_enough:
             segments.append(
                 Segment(
-                    start=current["start"],
-                    end=current["end"],
+                    start=float(current["first_window"]),
+                    end=float(current["last_window"]),
                     bpm=float(np.median(current["bpms"])),
                     confidence=float(np.mean(current["conf"])),
                     beats=sorted(set(current["beats"])),
                 )
             )
             current = {
-                "start": window["start"],
-                "end": window["end"],
+                "first_window": idx,
+                "last_window": idx,
                 "bpms": [bpm],
                 "conf": [window["confidence"]],
                 "beats": list(window["beats"]),
             }
         else:
-            current["end"] = window["end"]
+            current["last_window"] = idx
             current["bpms"].append(bpm)
             current["conf"].append(window["confidence"])
             current["beats"].extend(window["beats"])
 
     segments.append(
         Segment(
-            start=current["start"],
-            end=current["end"],
+            start=float(current["first_window"]),
+            end=float(current["last_window"]),
             bpm=float(np.median(current["bpms"])),
             confidence=float(np.mean(current["conf"])),
             beats=sorted(set(current["beats"])),
         )
     )
+
+    boundaries = [0.0]
+    for left, right in zip(segments, segments[1:]):
+        left_idx = int(left.end)
+        right_idx = int(right.start)
+        left_center = float(windows[left_idx]["center"])
+        right_center = float(windows[right_idx]["center"])
+        boundaries.append(float(np.clip((left_center + right_center) / 2.0, 0.0, duration)))
+    boundaries.append(duration)
+
+    for idx, segment in enumerate(segments):
+        segment.start = boundaries[idx]
+        segment.end = boundaries[idx + 1]
+        segment.beats = [beat for beat in segment.beats if segment.start <= beat < segment.end]
 
     merged: list[Segment] = []
     for segment in segments:

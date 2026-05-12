@@ -51,7 +51,7 @@ Why it matters:
 
 Handled by:
 
-- [beat_tracker.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/beat_tracker.py:21)
+- [beat_tracker.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/beat_tracker.py:7)
 
 Output:
 
@@ -59,6 +59,13 @@ Output:
 - base tempo estimate
 
 These beats are visualized in the timeline and later included in exports.
+
+Current approach:
+
+- detect onset peaks independently from the first tempo estimate
+- estimate BPM from robust intervals between peaks
+- refine peak positions against the waveform to reduce frame quantization error
+- keep half-time/double-time candidates visible instead of pretending there is only one answer
 
 ## 4. Global BPM
 
@@ -100,6 +107,12 @@ It uses practical constraints:
 - smoothing across nearby windows
 
 This avoids absurd micro-segments caused by noise.
+
+Important boundary rule:
+
+- analysis windows may overlap, but exported/displayed segments must not
+- grouped tempo runs are converted into contiguous boundaries using window centers
+- this prevents visual zones like `0-34`, `24-68`, `58-90` from overlapping on the timeline
 
 ## Key Parameters
 

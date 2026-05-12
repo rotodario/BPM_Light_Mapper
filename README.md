@@ -48,11 +48,19 @@ Nota: el soporte MP3 depende del backend disponible en tu entorno (`soundfile` o
 ## Flujo offline
 
 1. Cargar audio
-2. Ajustar parametros de analisis
-3. Ejecutar `Analizar`
-4. Revisar waveform, beats y segmentos
-5. Corregir manualmente en la tabla o con botones de edicion
-6. Exportar a JSON, CSV o TXT
+2. Opcional: usar `Cargar Test` para abrir fixtures WAV desde `tests/audio/fixtures`
+3. Ajustar parametros de analisis
+4. Ejecutar `Analizar`
+5. Revisar waveform, beats y segmentos
+6. Corregir manualmente en la tabla o con botones de edicion
+7. Exportar a JSON, CSV o TXT
+
+La UI offline esta organizada como panel tecnico:
+
+- waveform y beat grid arriba
+- `Segmentos` y `Terminal` en pestanas
+- `Indicadores` en columna propia
+- `Timing`, `Exportacion` y `Advanced` en pestanas laterales
 
 ## Modo live
 
@@ -65,17 +73,30 @@ Nota: el soporte MP3 depende del backend disponible en tu entorno (`soundfile` o
 
 ## Validacion sintetica
 
-Genera senales sinteticas y ejecuta un analisis basico:
+Fixtures versionados y validacion con criterios pass/fail:
+
+```bash
+python tools/validate_test_audios.py
+```
+
+El reporte Markdown se escribe en:
+
+```text
+data/test_reports/bpm_validation_report.md
+```
+
+Tambien existe un generador de senales sinteticas:
 
 ```bash
 python -m bpm_light_mapper.app.audio.synthetic_tests
 ```
 
-Esto crea un reporte con:
+La validacion cubre:
 
 - error de BPM global
-- deteccion de zonas esperadas
+- deteccion de zonas esperadas sin solapes
 - tolerancia de tempo en casos de half-time y silencios
+- baja confianza en material con transitorios debiles
 
 ## Limitaciones conocidas
 

@@ -43,6 +43,8 @@ bpm_light_mapper/
 - `beat_tracker.py`
   - computes onset envelope
   - detects beats
+  - refines detected peak times against the waveform to reduce frame quantization error
+  - estimates BPM from robust peak intervals
   - estimates beat consistency confidence
 
 - `offline_analyzer.py`
@@ -55,6 +57,7 @@ bpm_light_mapper/
   - computes local tempo over sliding windows
   - groups windows into stable BPM segments
   - applies smoothing and minimum segment duration heuristics
+  - converts overlapping analysis windows into non-overlapping displayed/exported segment boundaries
 
 - `live_analyzer.py`
   - opens selected input device
@@ -80,10 +83,12 @@ bpm_light_mapper/
 - `main_window.py`
   - main orchestration layer
   - file loading
+  - fixture loading via `Cargar Test`
   - launching analysis in a worker thread
   - segment editing actions
   - playback transport and playhead synchronization
   - waveform/table segment selection coordination
+  - compact tabbed offline layout for segments/terminal and timing/export/advanced controls
   - export actions
 
 - `waveform_widget.py`
@@ -107,6 +112,7 @@ bpm_light_mapper/
 - `theme.py`
   - central dark HUD palette
   - global QSS for Qt widgets
+  - dark styling for menus and combo dropdown popups
   - shared style helpers for status and action controls
 
 - `metric_card.py`, `status_badge.py`, `section_panel.py`, `timing_grid.py`
@@ -134,12 +140,13 @@ bpm_light_mapper/
 3. `beat_tracker.py` computes onset envelope and beats.
 4. `offline_analyzer.py` estimates global BPM and candidates.
 5. `tempo_map.py` derives local BPM windows and merges them into segments.
-6. `AnalysisResult` is sent back to the UI thread.
-7. UI renders waveform, beat markers and segments.
-8. User navigates with waveform clicks or segment table selection.
-9. Playback playhead, selected zone and table row stay synchronized.
-10. User edits segments manually if needed.
-11. Export modules write JSON/CSV/TXT.
+6. Segment boundaries are normalized so zones are contiguous and non-overlapping.
+7. `AnalysisResult` is sent back to the UI thread.
+8. UI renders waveform, beat markers and segments.
+9. User navigates with waveform clicks or segment table selection.
+10. Playback playhead, selected zone and table row stay synchronized.
+11. User edits segments manually if needed.
+12. Export modules write JSON/CSV/TXT.
 
 ### Live
 
