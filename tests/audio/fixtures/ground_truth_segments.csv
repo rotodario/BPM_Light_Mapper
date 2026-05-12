@@ -1,0 +1,14 @@
+file,start,end,bpm,bpm_start,bpm_end,alternate_bpm,meter,notes
+01_constant_click_120bpm_60s.wav,0.0,60,120,,,,,constant click
+02_constant_click_128bpm_60s.wav,0.0,60,128,,,,,constant click
+03_kick_hat_128bpm_60s.wav,0.0,60,128,,,,,constant kick/hat
+04_tempo_map_120_128_124bpm_90s.wav,0.0,30.0,120,,,,,intro
+04_tempo_map_120_128_124bpm_90s.wav,30.0,60.0,128,,,,,drop
+04_tempo_map_120_128_124bpm_90s.wav,60.0,90.0,124,,,,,outro
+05_128bpm_with_silence_breaks_75s.wav,0.0,20.0,128,,,,,active audio
+05_128bpm_with_silence_breaks_75s.wav,28.0,50.0,128,,,,,active audio
+05_128bpm_with_silence_breaks_75s.wav,57.0,75.0,128,,,,,active audio
+06_half_time_70_double_140_60s.wav,0.0,60,70,,,140,,half-time/double-time ambiguity
+07_gradual_ramp_120_to_128bpm_60s.wav,0.0,60,,120,128,,,gradual tempo ramp
+08_waltz_3_4_90bpm_60s.wav,0.0,60,90,,,,3/4,waltz meter
+09_low_onset_pad_100bpm_60s.wav,0.0,60,100,,,,,low onset confidence test

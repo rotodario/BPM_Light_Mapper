@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 import sys
 import time
@@ -26,7 +27,8 @@ def setup_logging() -> logging.Logger:
     if logger.handlers:
         return logger
 
-    logger.setLevel(logging.INFO)
+    level_name = os.environ.get("BPM_LIGHT_MAPPER_LOG_LEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, level_name, logging.INFO))
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(threadName)s | %(name)s | %(message)s"
     )
@@ -49,11 +51,12 @@ def setup_logging() -> logging.Logger:
         )
     file_handler.setFormatter(formatter)
 
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(formatter)
+    if os.environ.get("BPM_LIGHT_MAPPER_CONSOLE_LOG", "1") != "0":
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
 
     logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
     logger.propagate = False
     logger.info("Logging initialized. File: %s", log_file)
     return logger

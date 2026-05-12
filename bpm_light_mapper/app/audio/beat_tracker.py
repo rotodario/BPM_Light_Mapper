@@ -58,6 +58,122 @@ def _estimate_tempo_from_onsets(
     return float(np.clip(bpm, bpm_min, bpm_max))
 
 
+def _normalize_bpm(bpm: float, bpm_min: float, bpm_max: float) -> float:
+    if bpm <= 0:
+        return 0.0
+    while bpm < bpm_min:
+        bpm *= 2.0
+    while bpm > bpm_max:
+        bpm /= 2.0
+    return float(np.clip(bpm, bpm_min, bpm_max))
+
+
+def _detect_onset_peaks(
+    onset_envelope: np.ndarray,
+    onset_times: np.ndarray,
+    sample_rate: int,
+    hop_length: int,
+    bpm_max: float,
+) -> np.ndarray:
+    if len(onset_envelope) == 0 or len(onset_times) == 0:
+        return np.zeros(0, dtype=float)
+
+    min_period_frames = (60.0 / max(bpm_max, 1.0)) * sample_rate / hop_length
+    min_distance = max(1, int(round(min_period_frames * 0.35)))
+    active = onset_envelope[onset_envelope > 0]
+    if len(active) == 0:
+        return np.zeros(0, dtype=float)
+
+    prominence = max(0.03, float(np.percentile(active, 70)) * 0.35)
+    height = max(0.02, float(np.percentile(active, 55)) * 0.35)
+    peaks, _ = find_peaks(
+        onset_envelope,
+        distance=min_distance,
+        prominence=prominence,
+        height=height,
+    )
+    if len(peaks) < 4:
+        peaks, _ = find_peaks(onset_envelope, distance=min_distance, height=height)
+    return onset_times[peaks].astype(float)
+
+
+def _estimate_tempo_from_peak_times(
+    peak_times: np.ndarray,
+    bpm_min: float,
+    bpm_max: float,
+    fallback_bpm: float,
+) -> float:
+    if len(peak_times) < 4:
+        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
+
+    candidates: list[float] = []
+    weights: list[float] = []
+    max_step = min(4, len(peak_times) - 1)
+    min_interval = 60.0 / max(bpm_max * 2.0, 1.0)
+    max_interval = 60.0 / max(bpm_min / 2.0, 1.0)
+    for step in range(1, max_step + 1):
+        intervals = peak_times[step:] - peak_times[:-step]
+        intervals = intervals[(intervals >= min_interval) & (intervals <= max_interval)]
+        for interval in intervals:
+            bpm = _normalize_bpm(60.0 / float(interval), bpm_min, bpm_max)
+            if bpm > 0:
+                candidates.append(bpm)
+                weights.append(1.0 / step)
+
+    if not candidates:
+        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
+
+    values = np.asarray(candidates, dtype=float)
+    weights_arr = np.asarray(weights, dtype=float)
+    bins = np.arange(bpm_min, bpm_max + 1.0, 0.5)
+    hist, edges = np.histogram(values, bins=bins, weights=weights_arr)
+    if len(hist) == 0 or float(np.max(hist)) <= 0:
+        return float(np.clip(float(np.median(values)), bpm_min, bpm_max))
+
+    center = float((edges[int(np.argmax(hist))] + edges[int(np.argmax(hist)) + 1]) / 2.0)
+    near = values[np.abs(values - center) <= 1.0]
+    if len(near) == 0:
+        return center
+    return float(np.clip(np.median(near), bpm_min, bpm_max))
+
+
+def _refine_peak_times_from_waveform(
+    waveform: np.ndarray,
+    sample_rate: int,
+    rough_times: np.ndarray,
+    hop_length: int,
+    bpm_max: float,
+) -> np.ndarray:
+    if len(rough_times) == 0 or len(waveform) == 0:
+        return rough_times.astype(float)
+
+    samples = np.abs(np.asarray(waveform, dtype=np.float32))
+    refined: list[float] = []
+    for rough_time in rough_times:
+        center = int(round(float(rough_time) * sample_rate))
+        start = max(0, center - hop_length)
+        end = min(len(samples), center + hop_length * 4)
+        if end <= start:
+            continue
+        local_peak = int(np.argmax(samples[start:end]))
+        refined.append((start + local_peak) / sample_rate)
+
+    if not refined:
+        return rough_times.astype(float)
+
+    refined = sorted(refined)
+    min_gap = (60.0 / max(bpm_max, 1.0)) * 0.25
+    deduped: list[float] = []
+    for peak_time in refined:
+        if not deduped or peak_time - deduped[-1] >= min_gap:
+            deduped.append(peak_time)
+        elif abs(samples[int(min(peak_time * sample_rate, len(samples) - 1))]) > abs(
+            samples[int(min(deduped[-1] * sample_rate, len(samples) - 1))]
+        ):
+            deduped[-1] = peak_time
+    return np.asarray(deduped, dtype=float)
+
+
 def _detect_peak_beats(
     onset_envelope: np.ndarray,
     onset_times: np.ndarray,
@@ -82,6 +198,8 @@ def detect_beats(
     hop_length: int = 512,
     start_bpm: float = 120.0,
     tightness: float = 100.0,
+    bpm_min: float = 60.0,
+    bpm_max: float = 180.0,
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     onset_envelope, onset_times = compute_onset_envelope(
         waveform,
@@ -89,19 +207,37 @@ def detect_beats(
         hop_length=hop_length,
     )
     del tightness
-    tempo = _estimate_tempo_from_onsets(
+    fallback_tempo = _estimate_tempo_from_onsets(
         onset_envelope,
         sample_rate,
         hop_length,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
         fallback_bpm=start_bpm,
     )
-    beat_times = _detect_peak_beats(
+    beat_times = _detect_onset_peaks(
         onset_envelope,
         onset_times,
         sample_rate,
         hop_length,
-        tempo,
+        bpm_max,
     )
+    beat_times = _refine_peak_times_from_waveform(
+        waveform,
+        sample_rate,
+        beat_times,
+        hop_length,
+        bpm_max,
+    )
+    tempo = _estimate_tempo_from_peak_times(beat_times, bpm_min, bpm_max, fallback_tempo)
+    if len(beat_times) < 4:
+        beat_times = _detect_peak_beats(
+            onset_envelope,
+            onset_times,
+            sample_rate,
+            hop_length,
+            tempo,
+        )
     return float(tempo), beat_times, onset_envelope, onset_times
 
 

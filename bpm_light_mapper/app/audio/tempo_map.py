@@ -103,7 +103,8 @@ def generate_tempo_map(
 
     smoothed_bpms = np.array([window["bpm"] for window in windows], dtype=float)
     if len(smoothed_bpms) >= 3:
-        smoothed_bpms = np.convolve(smoothed_bpms, np.ones(3) / 3, mode="same")
+        padded_bpms = np.pad(smoothed_bpms, (1, 1), mode="edge")
+        smoothed_bpms = np.convolve(padded_bpms, np.ones(3) / 3, mode="valid")
 
     segments: list[Segment] = []
     current = {

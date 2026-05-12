@@ -383,12 +383,12 @@ class MainWindow(QMainWindow):
             params.min_segment_seconds = max(params.min_segment_seconds, 12.0)
         elif duration >= 300.0:
             params.target_sr = 11025
-            params.hop_length = 1024
+            params.hop_length = 512
             params.window_seconds = max(params.window_seconds, 14.0)
             params.hop_seconds = max(params.hop_seconds, 3.0)
         else:
-            params.target_sr = 11025
-            params.hop_length = 1024
+            params.target_sr = 22050
+            params.hop_length = 256
 
         return params
 

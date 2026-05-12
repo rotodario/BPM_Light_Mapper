@@ -1,0 +1,160 @@
+{
+  "sample_rate": 44100,
+  "tests": [
+    {
+      "file": "01_constant_click_120bpm_60s.wav",
+      "description": "Click track constante a 120 BPM",
+      "duration": 60,
+      "global_bpm": 120,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 120,
+          "notes": "constant click"
+        }
+      ]
+    },
+    {
+      "file": "02_constant_click_128bpm_60s.wav",
+      "description": "Click track constante a 128 BPM",
+      "duration": 60,
+      "global_bpm": 128,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 128,
+          "notes": "constant click"
+        }
+      ]
+    },
+    {
+      "file": "03_kick_hat_128bpm_60s.wav",
+      "description": "Patrón kick/hat constante a 128 BPM, más parecido a música electrónica simple",
+      "duration": 60,
+      "global_bpm": 128,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 128,
+          "notes": "constant kick/hat"
+        }
+      ]
+    },
+    {
+      "file": "04_tempo_map_120_128_124bpm_90s.wav",
+      "description": "Tema sintético con cambios de BPM por zonas",
+      "duration": 90.0,
+      "global_bpm": null,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 30.0,
+          "bpm": 120,
+          "notes": "intro"
+        },
+        {
+          "start": 30.0,
+          "end": 60.0,
+          "bpm": 128,
+          "notes": "drop"
+        },
+        {
+          "start": 60.0,
+          "end": 90.0,
+          "bpm": 124,
+          "notes": "outro"
+        }
+      ]
+    },
+    {
+      "file": "05_128bpm_with_silence_breaks_75s.wav",
+      "description": "128 BPM con silencios/breaks para probar estabilidad y recuperación",
+      "duration": 75,
+      "global_bpm": 128,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 20.0,
+          "bpm": 128,
+          "notes": "active audio"
+        },
+        {
+          "start": 28.0,
+          "end": 50.0,
+          "bpm": 128,
+          "notes": "active audio"
+        },
+        {
+          "start": 57.0,
+          "end": 75.0,
+          "bpm": 128,
+          "notes": "active audio"
+        }
+      ]
+    },
+    {
+      "file": "06_half_time_70_double_140_60s.wav",
+      "description": "Caso ambiguo: pulso fuerte a 70 BPM pero subdivisión marcada a 140 BPM",
+      "duration": 60,
+      "global_bpm": 70,
+      "alternate_bpm": 140,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 70,
+          "alternate_bpm": 140,
+          "notes": "half-time/double-time ambiguity"
+        }
+      ]
+    },
+    {
+      "file": "07_gradual_ramp_120_to_128bpm_60s.wav",
+      "description": "Ramp gradual de 120 a 128 BPM, para probar que no todo son segmentos bruscos",
+      "duration": 60,
+      "global_bpm": null,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm_start": 120,
+          "bpm_end": 128,
+          "notes": "gradual tempo ramp"
+        }
+      ]
+    },
+    {
+      "file": "08_waltz_3_4_90bpm_60s.wav",
+      "description": "Compás 3/4 a 90 BPM, para comprobar que no se confunde con acento de compás",
+      "duration": 60,
+      "global_bpm": 90,
+      "meter": "3/4",
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 90,
+          "meter": "3/4",
+          "notes": "waltz meter"
+        }
+      ]
+    },
+    {
+      "file": "09_low_onset_pad_100bpm_60s.wav",
+      "description": "Pad con transitorios débiles a 100 BPM. Caso difícil: debería dar baja confianza.",
+      "duration": 60,
+      "global_bpm": 100,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 100,
+          "notes": "low onset confidence test"
+        }
+      ]
+    }
+  ]
+}

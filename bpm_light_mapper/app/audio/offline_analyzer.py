@@ -21,8 +21,8 @@ class AnalysisCanceled(Exception):
 
 @dataclass
 class OfflineAnalysisParameters:
-    target_sr: int = 11025
-    hop_length: int = 1024
+    target_sr: int = 22050
+    hop_length: int = 256
     start_bpm: float = 120.0
     tightness: float = 70.0
     window_seconds: float = 12.0
@@ -108,6 +108,8 @@ def analyze_file(
             hop_length=params.hop_length,
             start_bpm=params.start_bpm,
             tightness=params.tightness,
+            bpm_min=params.bpm_min,
+            bpm_max=params.bpm_max,
         )
     _check_canceled(should_cancel)
     onset_envelope = onset_envelope * params.onset_sensitivity
