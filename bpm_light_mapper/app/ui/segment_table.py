@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
 from bpm_light_mapper.app.models.segment import Segment
 from bpm_light_mapper.app.ui.theme import COLORS
@@ -13,6 +13,13 @@ class SegmentTable(QTableWidget):
     selection_changed = Signal(int)
 
     HEADERS = ["Start", "End", "BPM", "Confidence", "Estado", "Notas"]
+    SEGMENT_COLORS = [
+        QColor(18, 67, 82, 165),
+        QColor(23, 73, 48, 165),
+        QColor(74, 58, 20, 165),
+        QColor(58, 45, 87, 165),
+        QColor(78, 48, 26, 165),
+    ]
 
     def __init__(self) -> None:
         super().__init__(0, len(self.HEADERS))
@@ -20,6 +27,9 @@ class SegmentTable(QTableWidget):
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.verticalHeader().setVisible(False)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.itemChanged.connect(self._on_item_changed)
         self.currentCellChanged.connect(self._on_selection_changed)
         self._segments: list[Segment] = []
@@ -60,18 +70,23 @@ class SegmentTable(QTableWidget):
         return "BAJA"
 
     def _apply_row_state(self, row: int, segment: Segment) -> None:
-        if segment.confirmed:
-            color = QColor(30, 75, 56, 170)
-        elif segment.confidence >= 0.75:
-            color = QColor(18, 52, 45, 150)
-        elif segment.confidence >= 0.45:
-            color = QColor(63, 48, 18, 150)
-        else:
-            color = QColor(61, 24, 34, 150)
+        segment_color = self.SEGMENT_COLORS[row % len(self.SEGMENT_COLORS)]
+        state_color = self._state_color(segment)
         for col in range(self.columnCount()):
             item = self.item(row, col)
             if item is not None:
-                item.setBackground(color)
+                item.setBackground(state_color if col == 4 else segment_color)
+
+    @staticmethod
+    def _state_color(segment: Segment) -> QColor:
+        if segment.confirmed:
+            return QColor(30, 95, 60, 190)
+        elif segment.confidence >= 0.75:
+            return QColor(18, 80, 56, 190)
+        elif segment.confidence >= 0.45:
+            return QColor(86, 62, 17, 190)
+        else:
+            return QColor(88, 28, 43, 190)
 
     def selected_row(self) -> int:
         return self.currentRow()

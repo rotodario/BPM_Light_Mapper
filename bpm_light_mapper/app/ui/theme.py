@@ -157,12 +157,17 @@ QTabBar::tab:selected {{
 
 QTableWidget {{
     background: #091018;
+    viewport-background-color: #091018;
     alternate-background-color: #0d1721;
     gridline-color: #1c2b3a;
     border: 1px solid {COLORS["panel_edge"]};
     border-radius: 8px;
     selection-background-color: #123647;
     selection-color: {COLORS["text"]};
+}}
+
+QHeaderView {{
+    background: #101a24;
 }}
 
 QHeaderView::section {{
@@ -172,6 +177,13 @@ QHeaderView::section {{
     border-right: 1px solid #1e2c3a;
     padding: 8px;
     font-weight: 900;
+}}
+
+QTableCornerButton::section {{
+    background: #101a24;
+    border: 0;
+    border-right: 1px solid #1e2c3a;
+    border-bottom: 1px solid #1e2c3a;
 }}
 
 QPlainTextEdit {{
