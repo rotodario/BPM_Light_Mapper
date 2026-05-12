@@ -1,0 +1,181 @@
+# BPM Light Mapper Architecture
+
+## Goal
+
+`BPM Light Mapper` is a desktop tool for lighting preproduction and live operation. It focuses on:
+
+- offline BPM mapping over time
+- beat grid inspection
+- editable tempo zones
+- exportable tempo maps
+- live BPM estimation with confidence and stability
+
+The architecture prioritizes:
+
+- analysis correctness over visual polish
+- manual correction over false certainty
+- modular code over a single large file
+- UI responsiveness during analysis
+
+## High-Level Structure
+
+```text
+bpm_light_mapper/
+  main.py
+  app/
+    audio/
+    export/
+    models/
+    ui/
+    utils/
+```
+
+## Module Responsibilities
+
+### `app/audio`
+
+- `loader.py`
+  - loads supported audio files
+  - normalizes metadata
+  - converts to mono for analysis
+  - keeps sample-rate and channel information
+
+- `beat_tracker.py`
+  - computes onset envelope
+  - detects beats
+  - estimates beat consistency confidence
+
+- `offline_analyzer.py`
+  - orchestrates the full offline analysis flow
+  - computes global BPM and candidate multiples/divisions
+  - emits warnings for tempo ambiguity
+  - builds the final `AnalysisResult`
+
+- `tempo_map.py`
+  - computes local tempo over sliding windows
+  - groups windows into stable BPM segments
+  - applies smoothing and minimum segment duration heuristics
+
+- `live_analyzer.py`
+  - opens selected input device
+  - performs rolling live tempo estimation
+  - smooths BPM history
+  - emits `searching`, `unstable`, `locked`
+
+- `synthetic_tests.py`
+  - generates synthetic validation material
+  - runs analysis against controlled cases
+  - produces a report for BPM error and segment count
+
+### `app/models`
+
+- `segment.py`
+  - editable BPM segment model
+
+- `analysis_result.py`
+  - aggregate analysis result for export and UI binding
+
+### `app/ui`
+
+- `main_window.py`
+  - main orchestration layer
+  - file loading
+  - launching analysis in a worker thread
+  - segment editing actions
+  - export actions
+
+- `waveform_widget.py`
+  - waveform display
+  - beat markers
+  - segment overlays
+
+- `segment_table.py`
+  - editable table for segment start/end/BPM/notes/confirmation
+
+- `live_panel.py`
+  - live device selection
+  - rolling BPM display
+  - tap tempo
+  - manual lock
+  - useful beat-duration subdivisions in ms
+
+### `app/export`
+
+- `export_json.py`
+  - full structured export
+
+- `export_csv.py`
+  - technician-friendly segment export
+  - optional TXT summary export
+
+### `app/utils`
+
+- formatting and logging helpers
+
+## Data Flow
+
+### Offline
+
+1. User loads an audio file.
+2. `loader.py` reads audio and metadata.
+3. `beat_tracker.py` computes onset envelope and beats.
+4. `offline_analyzer.py` estimates global BPM and candidates.
+5. `tempo_map.py` derives local BPM windows and merges them into segments.
+6. `AnalysisResult` is sent back to the UI thread.
+7. UI renders waveform, beat markers and segments.
+8. User edits segments manually if needed.
+9. Export modules write JSON/CSV/TXT.
+
+### Live
+
+1. User selects an audio input.
+2. `live_analyzer.py` opens a streaming input.
+3. Rolling windows are converted to onset energy.
+4. Tempo is estimated continuously.
+5. Smoothed BPM, confidence and state are emitted to the UI.
+6. `live_panel.py` shows BPM history, level and useful durations.
+
+## Heuristic Areas
+
+The following parts are intentionally heuristic:
+
+- half-time / double-time interpretation
+- local tempo estimation per window
+- confidence scoring
+- segment split thresholding
+- live-state classification
+
+These are designed to be practical, not academically exact.
+
+## Why Manual Correction Exists
+
+Real music introduces failure cases:
+
+- intros without clear transients
+- sparse percussion
+- heavy syncopation
+- swing and groove
+- tempo ramps
+- breakdowns and fills
+- half-time feel with full-time tempo
+
+Because of this, manual correction is a first-class feature rather than an afterthought.
+
+## Current Limitations
+
+- no embedded audio playback yet
+- no click/metronome overlay yet
+- no direct drag editing of segment boundaries on the waveform yet
+- live mode is useful but still basic
+- no beat-grid snapping tools yet
+- no dedicated persistence format for manual edit history yet
+
+## Planned Direction
+
+Near-term direction:
+
+- playback and click preview
+- stronger segment editing UX
+- better live lock behavior
+- improved synthetic validation
+- optional downbeat alignment tools
