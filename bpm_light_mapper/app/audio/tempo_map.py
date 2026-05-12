@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import librosa
 import numpy as np
 
 from bpm_light_mapper.app.models.segment import Segment
@@ -58,17 +57,21 @@ def generate_tempo_map(
     onset_envelope: np.ndarray,
     params: TempoMapParameters,
     progress_callback=None,
+    should_cancel=None,
 ) -> list[Segment]:
     duration = len(waveform) / sample_rate
     if duration <= 0:
         return []
 
-    times = librosa.times_like(onset_envelope, sr=sample_rate, hop_length=512)
+    hop_length = max(1, int(round((len(waveform) / sample_rate) / max(len(onset_envelope), 1) * sample_rate)))
+    times = np.arange(len(onset_envelope), dtype=float) * hop_length / sample_rate
     windows: list[dict] = []
     total_windows = max(1, int(np.ceil(duration / max(params.hop_seconds, 1e-9))))
     window_index = 0
     start = 0.0
     while start < duration:
+        if should_cancel is not None and should_cancel():
+            return []
         end = min(duration, start + params.window_seconds)
         mask = (times >= start) & (times < end)
         beat_mask = (beat_times >= start) & (beat_times < end)
@@ -77,15 +80,9 @@ def generate_tempo_map(
             local_env = onset_envelope[mask]
             bpm = _estimate_local_bpm_from_beats(local_beats, params.bpm_min, params.bpm_max)
             if bpm is None:
-                tempo = librosa.feature.tempo(
-                    onset_envelope=local_env,
-                    sr=sample_rate,
-                    hop_length=512,
-                    aggregate=np.median,
-                    max_tempo=params.bpm_max,
-                )
-                bpm = float(np.atleast_1d(tempo)[0])
-                bpm = float(np.clip(bpm, params.bpm_min, params.bpm_max))
+                start += params.hop_seconds
+                window_index += 1
+                continue
             confidence = _window_confidence(local_env, local_beats, bpm)
             windows.append(
                 {

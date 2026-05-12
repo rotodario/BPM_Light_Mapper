@@ -7,8 +7,8 @@ import pyqtgraph as pg
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -18,6 +18,11 @@ from PySide6.QtWidgets import (
 )
 
 from bpm_light_mapper.app.audio.live_analyzer import LiveBpmAnalyzer, LiveUpdate
+from bpm_light_mapper.app.ui.metric_card import MetricCard
+from bpm_light_mapper.app.ui.section_panel import SectionPanel
+from bpm_light_mapper.app.ui.status_badge import StatusBadge
+from bpm_light_mapper.app.ui.theme import COLORS
+from bpm_light_mapper.app.ui.timing_grid import TimingGrid
 
 
 class LivePanel(QWidget):
@@ -30,64 +35,76 @@ class LivePanel(QWidget):
         self.tap_times: list[float] = []
 
         layout = QVBoxLayout(self)
-        controls = QHBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        top = QHBoxLayout()
         self.device_combo = QComboBox()
-        self.refresh_button = QPushButton("Refrescar entradas")
+        self.refresh_button = QPushButton("Refrescar")
         self.start_button = QPushButton("Iniciar LIVE")
-        self.stop_button = QPushButton("Parar LIVE")
+        self.start_button.setProperty("role", "primary")
+        self.stop_button = QPushButton("Parar")
+        self.stop_button.setProperty("role", "danger")
         self.stop_button.setEnabled(False)
-        self.tap_button = QPushButton("Tap Tempo")
+        self.tap_button = QPushButton("TAP")
         self.lock_button = QPushButton("Lock TAP")
         self.lock_button.setCheckable(True)
-        controls.addWidget(self.device_combo, 1)
-        controls.addWidget(self.refresh_button)
-        controls.addWidget(self.start_button)
-        controls.addWidget(self.stop_button)
-        controls.addWidget(self.tap_button)
-        controls.addWidget(self.lock_button)
-        layout.addLayout(controls)
+        top.addWidget(QLabel("INPUT"))
+        top.addWidget(self.device_combo, 1)
+        top.addWidget(self.refresh_button)
+        top.addWidget(self.start_button)
+        top.addWidget(self.stop_button)
+        top.addWidget(self.tap_button)
+        top.addWidget(self.lock_button)
+        layout.addLayout(top)
 
-        metrics_box = QGroupBox("Deteccion LIVE")
-        metrics_layout = QGridLayout(metrics_box)
+        cockpit = QGridLayout()
+        cockpit.setSpacing(10)
+
+        bpm_frame = QFrame()
+        bpm_frame.setObjectName("SectionPanel")
+        bpm_layout = QVBoxLayout(bpm_frame)
+        bpm_layout.setContentsMargins(18, 14, 18, 16)
+        self.state_badge = StatusBadge("SEARCHING")
         self.bpm_label = QLabel("0.00")
-        self.bpm_label.setStyleSheet("font-size: 32px; font-weight: bold;")
-        self.state_label = QLabel("searching")
-        self.conf_label = QLabel("0.00")
-        self.tap_label = QLabel("-")
+        self.bpm_label.setObjectName("MetricValue")
+        self.bpm_label.setStyleSheet("font-size: 76px; font-weight: 900; color: #28d7ff;")
+        self.beat_label = QLabel("- ms / beat")
+        self.beat_label.setObjectName("MetricSubtitle")
+        bpm_layout.addWidget(self.state_badge)
+        bpm_layout.addWidget(self.bpm_label)
+        bpm_layout.addWidget(self.beat_label)
+        cockpit.addWidget(bpm_frame, 0, 0, 2, 2)
+
+        self.conf_card = MetricCard("Confianza", "0.00", compact=True)
+        self.tap_card = MetricCard("Tap BPM", "-", compact=True)
         self.level_bar = QProgressBar()
         self.level_bar.setRange(0, 100)
-        self.use_manual_lock = QLabel("Manual lock: no")
-        self.ms_labels = {
-            "1/1": QLabel("-"),
-            "1/2": QLabel("-"),
-            "1/4": QLabel("-"),
-            "1/8": QLabel("-"),
-            "1/16": QLabel("-"),
-        }
-        metrics_layout.addWidget(QLabel("BPM"), 0, 0)
-        metrics_layout.addWidget(self.bpm_label, 0, 1)
-        metrics_layout.addWidget(QLabel("Estado"), 1, 0)
-        metrics_layout.addWidget(self.state_label, 1, 1)
-        metrics_layout.addWidget(QLabel("Confianza"), 2, 0)
-        metrics_layout.addWidget(self.conf_label, 2, 1)
-        metrics_layout.addWidget(QLabel("Tap BPM"), 3, 0)
-        metrics_layout.addWidget(self.tap_label, 3, 1)
-        metrics_layout.addWidget(QLabel("Nivel"), 4, 0)
-        metrics_layout.addWidget(self.level_bar, 4, 1)
-        metrics_layout.addWidget(self.use_manual_lock, 5, 0, 1, 2)
-        row = 6
-        for key, label in self.ms_labels.items():
-            metrics_layout.addWidget(QLabel(key), row, 0)
-            metrics_layout.addWidget(label, row, 1)
-            row += 1
-        layout.addWidget(metrics_box)
+        level_panel = SectionPanel("Nivel entrada")
+        level_panel.body.addWidget(self.level_bar)
+        cockpit.addWidget(self.conf_card, 0, 2)
+        cockpit.addWidget(self.tap_card, 1, 2)
+        cockpit.addWidget(level_panel, 2, 2)
 
+        timing_panel = SectionPanel("Tiempos iluminacion")
+        self.timing_grid = TimingGrid()
+        timing_panel.body.addWidget(self.timing_grid)
+        cockpit.addWidget(timing_panel, 2, 0, 1, 2)
+        layout.addLayout(cockpit)
+
+        history_panel = SectionPanel("Historial BPM")
         self.history_plot = pg.PlotWidget()
+        self.history_plot.setBackground(COLORS["bg"])
         self.history_plot.setLabel("left", "BPM")
         self.history_plot.setLabel("bottom", "Muestras")
-        self.history_plot.showGrid(x=True, y=True, alpha=0.2)
-        self.history_curve = self.history_plot.plot([], [], pen=pg.mkPen("#d35400", width=2))
-        layout.addWidget(self.history_plot, 1)
+        self.history_plot.showGrid(x=True, y=True, alpha=0.16)
+        self.history_plot.getAxis("bottom").setPen(pg.mkPen("#41566a"))
+        self.history_plot.getAxis("left").setPen(pg.mkPen("#41566a"))
+        self.history_plot.getAxis("bottom").setTextPen(pg.mkPen(COLORS["muted"]))
+        self.history_plot.getAxis("left").setTextPen(pg.mkPen(COLORS["muted"]))
+        self.history_curve = self.history_plot.plot([], [], pen=pg.mkPen(COLORS["orange"], width=2))
+        history_panel.body.addWidget(self.history_plot)
+        layout.addWidget(history_panel, 1)
 
         self.refresh_button.clicked.connect(self.refresh_devices)
         self.start_button.clicked.connect(self.start_live)
@@ -124,6 +141,7 @@ class LivePanel(QWidget):
             return
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
+        self.state_badge.set_status("LIVE")
         self.log_message.emit("LIVE iniciado.")
 
     def stop_live(self) -> None:
@@ -132,6 +150,7 @@ class LivePanel(QWidget):
             self.analyzer = None
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+        self.state_badge.set_status("SEARCHING")
         self.log_message.emit("LIVE detenido.")
 
     def handle_tap(self) -> None:
@@ -142,28 +161,29 @@ class LivePanel(QWidget):
             intervals = [b - a for a, b in zip(self.tap_times[:-1], self.tap_times[1:]) if b > a]
             if intervals:
                 bpm = 60.0 / mean(intervals)
-                self.tap_label.setText(f"{bpm:.2f}")
+                self.tap_card.set_value(f"{bpm:.2f}")
                 if self.lock_button.isChecked():
-                    self.use_manual_lock.setText(f"Manual lock: si ({bpm:.2f} BPM)")
+                    self.state_badge.set_status("MANUAL LOCK")
 
     def update_live_metrics(self, update: LiveUpdate) -> None:
         self.live_update_received.emit(update)
 
     def _apply_live_update(self, update: LiveUpdate) -> None:
         display_bpm = update.bpm
-        display_state = update.state
+        display_state = update.state.upper().replace("-", " ")
         if self.lock_button.isChecked():
             try:
-                display_bpm = float(self.tap_label.text())
-                display_state = "manual-lock"
+                display_bpm = float(self.tap_card.value_label.text())
+                display_state = "MANUAL LOCK"
             except ValueError:
                 pass
         self.bpm_label.setText(f"{display_bpm:.2f}")
-        self.state_label.setText(display_state)
-        self.conf_label.setText(f"{update.confidence:.2f}")
+        self.state_badge.set_status(display_state)
+        self.conf_card.set_value(f"{update.confidence:.2f}")
         self.level_bar.setValue(int(max(0.0, min(1.0, update.level * 8.0)) * 100))
         beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
-        self._set_subdivision_labels(beat_ms)
+        self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
+        self.timing_grid.set_beat_ms(beat_ms)
         x = list(range(len(update.history)))
         self.history_curve.setData(x, update.history)
         if update.change_detected:
@@ -171,19 +191,8 @@ class LivePanel(QWidget):
 
     def _toggle_manual_lock(self, checked: bool) -> None:
         if checked:
-            self.use_manual_lock.setText(f"Manual lock: si ({self.tap_label.text()})")
+            self.state_badge.set_status("MANUAL LOCK")
             self.log_message.emit("Manual lock activado usando Tap Tempo.")
         else:
-            self.use_manual_lock.setText("Manual lock: no")
+            self.state_badge.set_status("SEARCHING")
             self.log_message.emit("Manual lock desactivado.")
-
-    def _set_subdivision_labels(self, beat_ms: float) -> None:
-        if beat_ms <= 0:
-            for label in self.ms_labels.values():
-                label.setText("-")
-            return
-        self.ms_labels["1/1"].setText(f"{beat_ms:.2f} ms")
-        self.ms_labels["1/2"].setText(f"{beat_ms / 2:.2f} ms")
-        self.ms_labels["1/4"].setText(f"{beat_ms / 4:.2f} ms")
-        self.ms_labels["1/8"].setText(f"{beat_ms / 8:.2f} ms")
-        self.ms_labels["1/16"].setText(f"{beat_ms / 16:.2f} ms")

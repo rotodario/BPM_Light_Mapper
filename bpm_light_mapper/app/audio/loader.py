@@ -6,33 +6,56 @@ from typing import Any
 import librosa
 import numpy as np
 import soundfile as sf
+from scipy.signal import resample_poly
+
+
+def _load_audio_streaming_mono(file_path: str, target_sr: int | None) -> tuple[np.ndarray, int, int, float, str, str, int]:
+    info = sf.info(file_path)
+    raw_sr = info.samplerate
+    channels = info.channels
+    duration = info.frames / raw_sr if raw_sr else 0.0
+    subtype = info.subtype
+    audio_format = info.format
+
+    if target_sr is None or target_sr >= raw_sr:
+        blocks = []
+        with sf.SoundFile(file_path) as handle:
+            for block in handle.blocks(blocksize=262_144, dtype="float32", always_2d=True):
+                blocks.append(block.mean(axis=1))
+        mono = np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.float32)
+        return mono.astype(np.float32), raw_sr, channels, duration, subtype, audio_format, len(mono)
+
+    gcd = int(np.gcd(raw_sr, target_sr))
+    up = target_sr // gcd
+    down = raw_sr // gcd
+    blocks = []
+    with sf.SoundFile(file_path) as handle:
+        for block in handle.blocks(blocksize=262_144, dtype="float32", always_2d=True):
+            mono_block = block.mean(axis=1)
+            resampled = resample_poly(mono_block, up, down).astype(np.float32)
+            blocks.append(resampled)
+    mono = np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.float32)
+    return mono.astype(np.float32), target_sr, channels, duration, subtype, audio_format, len(mono)
 
 
 def load_audio(file_path: str, target_sr: int | None = None) -> dict[str, Any]:
     path = Path(file_path)
     try:
         info = sf.info(file_path)
-        raw, raw_sr = sf.read(file_path, always_2d=True)
-        channels = raw.shape[1]
-        duration = len(raw) / raw_sr if raw_sr else 0.0
-        mono_source = raw.mean(axis=1).astype(np.float32)
-        frame_count = len(raw)
+        raw_sr = info.samplerate
+        mono, sample_rate, channels, duration, subtype, audio_format, frame_count = _load_audio_streaming_mono(
+            file_path,
+            target_sr,
+        )
+    except Exception:
+        mono, sample_rate = librosa.load(file_path, sr=target_sr, mono=True)
+        info = sf.info(file_path)
+        raw_sr = info.samplerate
+        channels = info.channels
+        duration = info.frames / raw_sr if raw_sr else (len(mono) / sample_rate if sample_rate else 0.0)
         subtype = info.subtype
         audio_format = info.format
-    except Exception:
-        mono_source, raw_sr = librosa.load(file_path, sr=None, mono=True)
-        channels = 1
-        duration = len(mono_source) / raw_sr if raw_sr else 0.0
-        frame_count = len(mono_source)
-        subtype = "unknown"
-        audio_format = path.suffix.lower().lstrip(".") or "unknown"
-
-    if target_sr is not None and raw_sr != target_sr:
-        mono = librosa.resample(mono_source, orig_sr=raw_sr, target_sr=target_sr)
-        sample_rate = target_sr
-    else:
-        mono = mono_source
-        sample_rate = raw_sr
+        frame_count = len(mono)
 
     waveform = mono / max(np.max(np.abs(mono)), 1e-9)
 

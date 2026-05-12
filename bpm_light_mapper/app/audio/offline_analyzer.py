@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime
 
-import librosa
 import numpy as np
 
 from bpm_light_mapper.app.audio.beat_tracker import (
@@ -13,14 +12,19 @@ from bpm_light_mapper.app.audio.beat_tracker import (
 from bpm_light_mapper.app.audio.loader import load_audio
 from bpm_light_mapper.app.audio.tempo_map import TempoMapParameters, generate_tempo_map
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
+from bpm_light_mapper.app.utils.logging_utils import get_logger, log_timing
+
+
+class AnalysisCanceled(Exception):
+    pass
 
 
 @dataclass
 class OfflineAnalysisParameters:
-    target_sr: int = 22050
-    hop_length: int = 512
+    target_sr: int = 11025
+    hop_length: int = 1024
     start_bpm: float = 120.0
-    tightness: float = 100.0
+    tightness: float = 70.0
     window_seconds: float = 12.0
     hop_seconds: float = 2.0
     min_bpm_change: float = 3.0
@@ -61,32 +65,62 @@ def _estimate_global_bpm_from_beats(
     return float(np.clip(bpm, bpm_min, bpm_max))
 
 
-def analyze_file(file_path: str, params: OfflineAnalysisParameters, progress_callback=None) -> tuple[dict, AnalysisResult]:
+def _check_canceled(should_cancel) -> None:
+    if should_cancel is not None and should_cancel():
+        raise AnalysisCanceled("Analysis canceled")
+
+
+def analyze_file(
+    file_path: str,
+    params: OfflineAnalysisParameters,
+    progress_callback=None,
+    should_cancel=None,
+) -> tuple[dict, AnalysisResult]:
+    logger = get_logger("offline")
+    logger.info("Analyze requested for file: %s", file_path)
+    logger.info("Offline params: %s", asdict(params))
+    _check_canceled(should_cancel)
     if progress_callback is not None:
         progress_callback("cargando audio completo...")
-    audio = load_audio(file_path, target_sr=params.target_sr)
+    with log_timing("offline.load_audio", logger):
+        audio = load_audio(file_path, target_sr=params.target_sr)
+    _check_canceled(should_cancel)
     waveform = audio["waveform"]
     sample_rate = audio["sample_rate"]
+    logger.info(
+        "Audio ready | duration=%.2fs sr=%s channels=%s samples=%s",
+        audio["duration"],
+        sample_rate,
+        audio["channels"],
+        len(waveform),
+    )
+    if progress_callback is not None:
+        progress_callback(
+            f"audio listo: {audio['duration']:.1f}s, sr analisis {sample_rate}, muestras {len(waveform)}"
+        )
 
     if progress_callback is not None:
         progress_callback("detectando beats...")
-    bpm_global, beat_times, onset_envelope, onset_times = detect_beats(
-        waveform,
-        sample_rate,
-        hop_length=params.hop_length,
-        start_bpm=params.start_bpm,
-        tightness=params.tightness,
-    )
+    with log_timing("offline.detect_beats", logger):
+        bpm_global, beat_times, onset_envelope, onset_times = detect_beats(
+            waveform,
+            sample_rate,
+            hop_length=params.hop_length,
+            start_bpm=params.start_bpm,
+            tightness=params.tightness,
+        )
+    _check_canceled(should_cancel)
     onset_envelope = onset_envelope * params.onset_sensitivity
 
     if progress_callback is not None:
         progress_callback("estimando BPM global...")
-    bpm_global = _estimate_global_bpm_from_beats(
-        beat_times,
-        bpm_global,
-        params.bpm_min,
-        params.bpm_max,
-    )
+    with log_timing("offline.estimate_global_bpm", logger):
+        bpm_global = _estimate_global_bpm_from_beats(
+            beat_times,
+            bpm_global,
+            params.bpm_min,
+            params.bpm_max,
+        )
 
     confidence_global = beat_consistency_confidence(beat_times, bpm_global)
     warnings: list[str] = []
@@ -105,13 +139,24 @@ def analyze_file(file_path: str, params: OfflineAnalysisParameters, progress_cal
     )
     if progress_callback is not None:
         progress_callback("segmentando zonas BPM...")
-    segments = generate_tempo_map(
-        waveform,
-        sample_rate,
-        beat_times,
-        onset_envelope,
-        map_params,
-        progress_callback=progress_callback,
+    with log_timing("offline.generate_tempo_map", logger):
+        segments = generate_tempo_map(
+            waveform,
+            sample_rate,
+            beat_times,
+            onset_envelope,
+            map_params,
+            progress_callback=progress_callback,
+            should_cancel=should_cancel,
+        )
+    _check_canceled(should_cancel)
+    logger.info(
+        "Analysis done | bpm_global=%.2f confidence=%.3f beats=%s segments=%s warnings=%s",
+        bpm_global,
+        confidence_global,
+        len(beat_times),
+        len(segments),
+        warnings,
     )
 
     result = AnalysisResult(

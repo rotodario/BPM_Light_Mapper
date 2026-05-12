@@ -10,6 +10,8 @@ import librosa
 import numpy as np
 import sounddevice as sd
 
+from bpm_light_mapper.app.utils.logging_utils import get_logger
+
 
 @dataclass
 class LiveUpdate:
@@ -34,6 +36,7 @@ class LiveBpmAnalyzer:
         callback: Callable[[LiveUpdate], None] | None = None,
         error_callback: Callable[[str], None] | None = None,
     ) -> None:
+        self.logger = get_logger("live")
         self.device = device
         self.sample_rate = sample_rate
         self.channels = channels
@@ -61,6 +64,7 @@ class LiveBpmAnalyzer:
         return result
 
     def start(self) -> None:
+        self.logger.info("Starting live analyzer on device=%s sr=%s block_size=%s", self.device, self.sample_rate, self.block_size)
         self._warmup_librosa()
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
@@ -72,6 +76,7 @@ class LiveBpmAnalyzer:
         self.stream.start()
 
     def stop(self) -> None:
+        self.logger.info("Stopping live analyzer")
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
@@ -171,5 +176,6 @@ class LiveBpmAnalyzer:
         if message == self.last_error:
             return
         self.last_error = message
+        self.logger.error(message)
         if self.error_callback is not None:
             self.error_callback(message)
