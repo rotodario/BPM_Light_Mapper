@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QSizePolicy,
     QPushButton,
     QProgressBar,
     QVBoxLayout,
@@ -55,6 +56,13 @@ class LivePanel(QWidget):
         self.last_live_update_timestamp = 0.0
         self.last_change_timestamp = 0.0
         self.waveform_x = np.arange(360, dtype=float)
+        self.history_x = np.arange(240, dtype=float)
+        self.history_display = np.full(240, np.nan, dtype=float)
+        self.target_bpm = 0.0
+        self.display_bpm = 0.0
+        self.target_confidence = 0.0
+        self.display_confidence = 0.0
+        self.target_state = "SEARCHING"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -105,24 +113,24 @@ class LivePanel(QWidget):
         self.tap_card = MetricCard("Tap BPM", "-", compact=True)
         self.level_bar = QProgressBar()
         self.level_bar.setRange(0, 100)
+        self.level_bar.setMaximumHeight(12)
+        self.level_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         level_panel = SectionPanel("Nivel entrada")
+        level_panel.layout().setContentsMargins(8, 5, 8, 8)
+        level_panel.layout().setSpacing(4)
+        level_panel.title_label.setMaximumHeight(14)
+        level_panel.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        level_panel.body.setSpacing(4)
+        level_panel.layout().setStretch(0, 0)
+        level_panel.layout().setStretch(1, 0)
         level_panel.body.addWidget(self.level_bar)
-        cockpit.addWidget(self.conf_card, 0, 2)
-        cockpit.addWidget(self.tap_card, 1, 2)
-        cockpit.addWidget(level_panel, 2, 2)
-
-        timing_panel = SectionPanel("Tiempos iluminacion")
-        self.timing_grid = TimingGrid()
-        timing_panel.body.addWidget(self.timing_grid)
-        cockpit.addWidget(timing_panel, 2, 0, 1, 2)
-        layout.addLayout(cockpit)
-
-        waveform_panel = SectionPanel("Waveform LIVE")
         self.waveform_plot = pg.PlotWidget()
         self.waveform_plot.setBackground(COLORS["bg"])
         self.waveform_plot.setMouseEnabled(x=False, y=False)
         self.waveform_plot.hideAxis("bottom")
         self.waveform_plot.setYRange(-1.0, 1.0)
+        self.waveform_plot.setMinimumSize(0, 0)
+        self.waveform_plot.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.waveform_plot.showGrid(x=False, y=True, alpha=0.10)
         self.waveform_plot.getAxis("left").setPen(pg.mkPen("#41566a"))
         self.waveform_plot.getAxis("left").setTextPen(pg.mkPen(COLORS["muted"]))
@@ -142,8 +150,20 @@ class LivePanel(QWidget):
             brush=pg.mkBrush(40, 215, 255, 55),
         )
         self.waveform_plot.addItem(self.waveform_fill)
-        waveform_panel.body.addWidget(self.waveform_plot)
-        layout.addWidget(waveform_panel, 1)
+        level_panel.body.addWidget(self.waveform_plot, 1)
+        level_panel.body.setStretch(0, 0)
+        level_panel.body.setStretch(1, 1)
+        cockpit.addWidget(self.conf_card, 0, 2)
+        cockpit.addWidget(self.tap_card, 1, 2)
+        cockpit.addWidget(level_panel, 2, 2)
+
+        timing_panel = SectionPanel("Tiempos iluminacion")
+        self.timing_grid = TimingGrid()
+        timing_panel.body.addWidget(self.timing_grid)
+        timing_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        level_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        cockpit.addWidget(timing_panel, 2, 0, 1, 2)
+        layout.addLayout(cockpit)
 
         history_panel = SectionPanel("Historial BPM")
         self.history_plot = pg.PlotWidget()
@@ -155,7 +175,7 @@ class LivePanel(QWidget):
         self.history_plot.getAxis("left").setPen(pg.mkPen("#41566a"))
         self.history_plot.getAxis("bottom").setTextPen(pg.mkPen(COLORS["muted"]))
         self.history_plot.getAxis("left").setTextPen(pg.mkPen(COLORS["muted"]))
-        self.history_curve = self.history_plot.plot([], [], pen=pg.mkPen(COLORS["orange"], width=2))
+        self.history_curve = self.history_plot.plot(self.history_x, self.history_display, pen=pg.mkPen(COLORS["orange"], width=2))
         history_panel.body.addWidget(self.history_plot)
         layout.addWidget(history_panel, 1)
 
@@ -209,6 +229,12 @@ class LivePanel(QWidget):
         self.state_badge.set_status("LIVE")
         self.last_live_update_timestamp = 0.0
         self.last_change_timestamp = 0.0
+        self.target_bpm = 0.0
+        self.display_bpm = 0.0
+        self.target_confidence = 0.0
+        self.display_confidence = 0.0
+        self.target_state = "SEARCHING"
+        self.history_display[:] = np.nan
         self.render_timer.start()
         self.log_message.emit("LIVE iniciado.")
 
@@ -235,6 +261,11 @@ class LivePanel(QWidget):
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.state_badge.set_status("SEARCHING")
+        self.bpm_label.setText("0.00")
+        self.beat_label.setText("- ms / beat")
+        self.conf_card.set_value("0.00")
+        self.history_display[:] = np.nan
+        self.history_curve.setData(self.history_x, self.history_display)
         self.log_message.emit("LIVE detenido.")
 
     def handle_tap(self) -> None:
@@ -262,7 +293,8 @@ class LivePanel(QWidget):
         update = self.analyzer.latest_live_update()
         if update is not None and update.timestamp > self.last_live_update_timestamp:
             self.last_live_update_timestamp = update.timestamp
-            self._apply_live_update(update)
+            self._ingest_live_update(update)
+        self._render_live_metrics()
 
     def _apply_live_visual(self, visual) -> None:
         if len(visual.waveform_min) and len(visual.waveform_max):
@@ -273,12 +305,16 @@ class LivePanel(QWidget):
         self.level_bar.setValue(int(max(0.0, min(1.0, visual.level * 8.0)) * 100))
 
     def _apply_live_update(self, update: LiveUpdate) -> None:
+        self._ingest_live_update(update)
+        self._render_live_metrics(force=True)
+
+    def _ingest_live_update(self, update: LiveUpdate) -> None:
         display_bpm = update.bpm
         display_state = update.state.upper().replace("-", " ")
         normalized_half = False
-        if self.normalize_half_button.isChecked() and 60.0 <= display_bpm < 90.0 and update.confidence >= 0.55:
+        if self.normalize_half_button.isChecked() and 60.0 <= display_bpm < 120.0 and update.confidence >= 0.55:
             doubled = display_bpm * 2.0
-            if doubled <= 190.0:
+            if doubled <= 240.0:
                 display_bpm = doubled
                 normalized_half = True
         if self.lock_button.isChecked():
@@ -287,19 +323,43 @@ class LivePanel(QWidget):
                 display_state = "MANUAL LOCK"
             except ValueError:
                 pass
-        self.bpm_label.setText(f"{display_bpm:.2f}")
-        self.state_badge.set_status(display_state)
-        self.conf_card.set_value(f"{update.confidence:.2f}")
-        beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
-        self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
-        self.timing_grid.set_beat_ms(beat_ms)
-        x = list(range(len(update.history)))
-        self.history_curve.setData(x, update.history)
+        self.target_bpm = display_bpm
+        self.target_confidence = update.confidence
+        self.target_state = display_state
         if normalized_half and "MANUAL" not in display_state:
             self.log_message.emit(f"Half-time normalizado a x2: {update.bpm:.2f} -> {display_bpm:.2f} BPM")
         if update.change_detected and update.timestamp > self.last_change_timestamp:
             self.last_change_timestamp = update.timestamp
             self.log_message.emit(f"Cambio de BPM detectado cerca de {update.bpm:.2f} BPM.")
+
+    def _render_live_metrics(self, force: bool = False) -> None:
+        target_bpm = self.target_bpm
+        target_state = self.target_state
+        if self.lock_button.isChecked():
+            try:
+                target_bpm = float(self.tap_card.value_label.text())
+                target_state = "MANUAL LOCK"
+            except ValueError:
+                pass
+        if force or self.display_bpm <= 0.0 or target_bpm <= 0.0:
+            self.display_bpm = target_bpm
+        else:
+            self.display_bpm = (self.display_bpm * 0.82) + (target_bpm * 0.18)
+        self.display_confidence = (
+            self.target_confidence if force else (self.display_confidence * 0.85) + (self.target_confidence * 0.15)
+        )
+        display_bpm = self.display_bpm
+        display_state = target_state
+        self.bpm_label.setText(f"{display_bpm:.2f}")
+        self.state_badge.set_status(display_state)
+        self.conf_card.set_value(f"{self.display_confidence:.2f}")
+        beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
+        self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
+        self.timing_grid.set_beat_ms(beat_ms)
+        if display_bpm > 0:
+            self.history_display[:-1] = self.history_display[1:]
+            self.history_display[-1] = display_bpm
+            self.history_curve.setData(self.history_x, self.history_display)
 
     def _toggle_manual_lock(self, checked: bool) -> None:
         if checked:

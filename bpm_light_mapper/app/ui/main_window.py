@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtCore import QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
@@ -583,7 +583,7 @@ class MainWindow(QMainWindow):
         self.analysis_result = result
         self.beat_offset_applied = 0.0
         self.beat_offset_spin.setValue(0.0)
-        self._set_busy(False, "IDLE", "listo")
+        self._set_busy(True, "ANALYZING", "renderizando resultados...")
         self.file_info.setText(
             f"Archivo: {result.file_name} | {self._format_duration(result.duration)} | "
             f"SR {result.sample_rate} | {result.channels} ch"
@@ -598,16 +598,30 @@ class MainWindow(QMainWindow):
         self.zone_count_card.set_value(str(len(result.segments)))
         self.duration_card.set_value(self._format_duration(result.duration), f"{result.duration:.2f}s")
         self.offline_timing_grid.set_beat_ms(beat_ms)
+        self.log("Analisis calculado. Renderizando waveform, beats y segmentos...")
+        QTimer.singleShot(0, self._render_analysis_result)
+
+    def _render_analysis_result(self) -> None:
+        if self.current_audio is None or self.analysis_result is None:
+            self._set_busy(False, "IDLE", "listo")
+            return
+        audio = self.current_audio
+        result = self.analysis_result
         self.waveform_widget.set_waveform(audio["waveform"], result.duration)
         self.waveform_widget.set_beats(result.beat_times)
         self.waveform_widget.set_segments(result.segments)
         self.segment_table.load_segments(result.segments)
         if result.segments:
-            self.segment_table.selectRow(0)
-            self.on_segment_selected(0)
+            self.selecting_from_waveform = True
+            try:
+                self.segment_table.selectRow(0)
+                self.on_segment_selected(0)
+            finally:
+                self.selecting_from_waveform = False
         for warning in result.warnings:
             self.log(f"Aviso: {warning}")
         self.log(f"Analisis completado. Segmentos detectados: {len(result.segments)}.")
+        self._set_busy(False, "IDLE", "listo")
 
     def apply_beat_offset(self) -> None:
         if self.analysis_result is None:

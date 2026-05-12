@@ -31,7 +31,7 @@ class WaveformWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.plot)
         self.wave_curve = self.plot.plot([], [], pen=pg.mkPen(COLORS["cyan"], width=1.2))
-        self.beat_lines: list[pg.InfiniteLine] = []
+        self.beat_curve = self.plot.plot([], [], pen=pg.mkPen((247, 201, 72, 105), width=1))
         self.segment_regions: list[pg.LinearRegionItem] = []
         self.segment_labels: list[pg.TextItem] = []
         self.playhead = pg.InfiniteLine(pos=0.0, angle=90, pen=pg.mkPen(COLORS["red"], width=2))
@@ -54,13 +54,14 @@ class WaveformWidget(QWidget):
         self.set_playhead(0.0)
 
     def set_beats(self, beat_times: list[float]) -> None:
-        for line in self.beat_lines:
-            self.plot.removeItem(line)
-        self.beat_lines.clear()
-        for beat in beat_times:
-            line = pg.InfiniteLine(pos=beat, angle=90, pen=pg.mkPen((247, 201, 72, 105), width=1))
-            self.plot.addItem(line)
-            self.beat_lines.append(line)
+        if not beat_times:
+            self.beat_curve.setData([], [])
+            return
+        beats = np.asarray(beat_times, dtype=float)
+        x = np.repeat(beats, 3)
+        y = np.tile(np.array([-1.0, 1.0, np.nan], dtype=float), len(beats))
+        x[2::3] = np.nan
+        self.beat_curve.setData(x, y)
 
     def set_segments(self, segments: list[Segment]) -> None:
         for region in self.segment_regions:

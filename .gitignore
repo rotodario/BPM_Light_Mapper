@@ -36,3 +36,4 @@ Thumbs.db
 # Project runtime output
 synthetic_test_output/
 *.log
+*.log.*

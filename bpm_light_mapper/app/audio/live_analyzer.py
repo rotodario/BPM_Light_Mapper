@@ -48,7 +48,7 @@ class LiveBpmAnalyzer:
         waveform_columns: int = 360,
         hop_length: int = 512,
         bpm_min: float = 35.0,
-        bpm_max: float = 190.0,
+        bpm_max: float = 240.0,
         callback: Callable[[LiveUpdate], None] | None = None,
         error_callback: Callable[[str], None] | None = None,
     ) -> None:
