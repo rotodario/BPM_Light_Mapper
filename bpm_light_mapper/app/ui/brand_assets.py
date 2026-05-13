@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtGui import QIcon
@@ -9,6 +10,11 @@ from PySide6.QtGui import QIcon
 APP_NAME = "BeatScope"
 APP_SUBTITLE = "BPM & Audio Tempo Analysis"
 ASSETS_FOLDER = "BeatScope_brand_assets"
+AUTHOR_NAME = "Jose Osuna"
+AUTHOR_URL = "www.joseosuna.com"
+CURRENT_YEAR = datetime.now().year
+AUTHOR_CREDIT = f"{CURRENT_YEAR} {AUTHOR_NAME}  {AUTHOR_URL}"
+FOOTER_TEXT = f"{APP_NAME} · {CURRENT_YEAR} {AUTHOR_NAME} · {AUTHOR_URL}"
 
 
 def resource_path(relative_path: str) -> Path:

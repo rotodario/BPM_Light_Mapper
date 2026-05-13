@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-import sounddevice as sd
-from scipy.signal import find_peaks
 
 from bpm_light_mapper.app.audio.beat_tracker import compute_onset_envelope
 from bpm_light_mapper.app.audio.tempo_candidate_resolver import resolve_tempo_candidates
@@ -72,7 +70,7 @@ class LiveBpmAnalyzer:
         self.bpm_max = bpm_max
         self.callback = callback
         self.error_callback = error_callback
-        self.stream: sd.InputStream | None = None
+        self.stream = None
         self.buffer = np.zeros(self.window_samples, dtype=np.float32)
         self.write_index = 0
         self.filled_samples = 0
@@ -106,6 +104,8 @@ class LiveBpmAnalyzer:
 
     @staticmethod
     def list_input_devices() -> list[tuple[int, str]]:
+        import sounddevice as sd
+
         devices = sd.query_devices()
         result = []
         for idx, device in enumerate(devices):
@@ -123,6 +123,8 @@ class LiveBpmAnalyzer:
             self.update_interval,
         )
         self.stop_event.clear()
+        import sounddevice as sd
+
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
             blocksize=self.block_size,
@@ -498,6 +500,8 @@ class LiveBpmAnalyzer:
         env = np.asarray(onset_env, dtype=float)
         if len(env) < 8 or np.max(env) <= 1e-9:
             return onset_env
+        from scipy.signal import find_peaks
+
         distance = max(1, int(round(0.16 * self.sample_rate / self.hop_length)))
         peaks, _ = find_peaks(env, distance=distance, prominence=max(0.02, float(np.max(env)) * 0.05))
         if len(peaks) < 3:
@@ -556,6 +560,8 @@ class LiveBpmAnalyzer:
         if len(env) < 8 or np.max(env) <= 1e-9:
             return bpm
 
+        from scipy.signal import find_peaks
+
         env_max = max(float(np.max(env)), 1e-9)
         prominence = max(0.03, env_max * 0.08)
         peaks, _ = find_peaks(env, distance=2, prominence=prominence)
@@ -599,6 +605,8 @@ class LiveBpmAnalyzer:
     def _onset_peak_times(onset_env: np.ndarray, onset_times: np.ndarray) -> np.ndarray:
         if len(onset_env) < 4 or len(onset_times) != len(onset_env):
             return np.zeros(0, dtype=float)
+        from scipy.signal import find_peaks
+
         env_max = max(float(np.max(onset_env)), 1e-9)
         peaks, _ = find_peaks(onset_env, distance=2, prominence=max(0.03, env_max * 0.08))
         return onset_times[peaks].astype(float)

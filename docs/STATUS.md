@@ -31,6 +31,7 @@
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
 - dark styled dropdowns for test loading and live input selection
+- BeatScope logo/icon branding with footer author credit and splash status branding
 - application logging for analysis and live diagnostics
 - synthetic test generator script
 - committed synthetic audio fixtures and validation runner

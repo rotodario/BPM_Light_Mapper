@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 
 ROOT = Path(SPECPATH)
@@ -30,22 +30,16 @@ hiddenimports = [
     "soxr",
 ]
 
-hiddenimports += collect_submodules("lazy_loader")
-
-datas += collect_data_files("PySide6")
 binaries += collect_dynamic_libs("numpy")
 binaries += collect_dynamic_libs("scipy")
 binaries += collect_dynamic_libs("soundfile")
-
-fixtures_dir = ROOT / "tests" / "audio" / "fixtures"
-if fixtures_dir.exists():
-    datas.append((str(fixtures_dir), "tests/audio/fixtures"))
 
 brand_assets_dir = ROOT / "BeatScope_brand_assets"
 if brand_assets_dir.exists():
     datas.append((str(brand_assets_dir), "BeatScope_brand_assets"))
 
 app_icon = brand_assets_dir / "beatscope.ico"
+splash_image = brand_assets_dir / "beatscope_splash.png"
 
 
 a = Analysis(
@@ -59,16 +53,26 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "cupy",
+        "babel",
+        "certifi",
+        "docutils",
         "IPython",
         "jupyter",
+        "lxml",
         "matplotlib",
         "matplotlib.tests",
         "numpy.tests",
         "OpenGL",
         "pandas",
+        "PIL",
+        "PyQt5",
+        "PyQt6",
         "pygame",
         "pytest",
+        "requests",
+        "sklearn",
         "scipy.tests",
+        "sphinx",
         "tensorflow",
         "torch",
         "torchaudio",
@@ -76,17 +80,28 @@ a = Analysis(
         "PySide6.QtWebEngineCore",
         "PySide6.QtWebEngineWidgets",
         "PySide6.QtWebEngineQuick",
+        "tkinter",
+        "urllib3",
     ],
     noarchive=False,
     optimize=1,
 )
 pyz = PYZ(a.pure)
+splash = Splash(
+    str(splash_image),
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=(34, 378),
+    text_size=13,
+    text_color="#EAF4FF",
+) if splash_image.exists() else None
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.datas,
+    *([splash] if splash is not None else []),
     [],
     name="BeatScope",
     debug=False,

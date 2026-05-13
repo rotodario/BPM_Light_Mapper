@@ -39,6 +39,17 @@ QFrame#AppHeader {{
     border-radius: 8px;
 }}
 
+QFrame#AppFooter {{
+    background: transparent;
+    border: 0;
+}}
+
+QLabel#FooterText {{
+    color: {COLORS["muted"]};
+    font-size: 10px;
+    font-weight: 600;
+}}
+
 QFrame#SectionPanel, QFrame#MetricCard, QFrame#TimingGrid {{
     background: {COLORS["panel"]};
     border: 1px solid {COLORS["panel_edge"]};

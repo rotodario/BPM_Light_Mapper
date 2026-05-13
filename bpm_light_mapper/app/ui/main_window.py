@@ -29,13 +29,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from bpm_light_mapper.app.audio.loader import load_audio_preview
-from bpm_light_mapper.app.audio.offline_analyzer import AnalysisCanceled, OfflineAnalysisParameters, analyze_file
 from bpm_light_mapper.app.export.export_csv import export_segments_csv, export_segments_txt
 from bpm_light_mapper.app.export.export_json import export_analysis_json
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.models.segment import Segment
-from bpm_light_mapper.app.ui.brand_assets import APP_NAME, APP_SUBTITLE, LOGO_DARK_PATH, window_icon
+from bpm_light_mapper.app.ui.brand_assets import APP_NAME, APP_SUBTITLE, FOOTER_TEXT, LOGO_DARK_PATH, window_icon
 from bpm_light_mapper.app.ui.live_panel import LivePanel
 from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
@@ -58,12 +56,14 @@ class AnalysisThread(QThread):
     progress = Signal(str)
     canceled = Signal()
 
-    def __init__(self, file_path: str, params: OfflineAnalysisParameters) -> None:
+    def __init__(self, file_path: str, params: object) -> None:
         super().__init__()
         self.file_path = file_path
         self.params = params
 
     def run(self) -> None:
+        from bpm_light_mapper.app.audio.offline_analyzer import AnalysisCanceled, analyze_file
+
         try:
             audio, result = analyze_file(
                 self.file_path,
@@ -88,6 +88,8 @@ class AudioLoadThread(QThread):
 
     def run(self) -> None:
         try:
+            from bpm_light_mapper.app.audio.loader import load_audio_preview
+
             audio = load_audio_preview(self.file_path, max_points=6000)
             self.finished_ok.emit(audio)
         except Exception as exc:
@@ -133,6 +135,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.offline_tab, "OFFLINE ANALYSIS")
         self.tabs.addTab(self.live_panel, "LIVE")
         root_layout.addWidget(self.tabs, 1)
+        root_layout.addWidget(self._build_footer())
 
         self._connect_actions()
         self.player.positionChanged.connect(self.on_player_position_changed)
@@ -206,6 +209,22 @@ class MainWindow(QMainWindow):
         layout.addLayout(status_block, 2)
         layout.addLayout(actions)
         return header
+
+    def _build_footer(self) -> QWidget:
+        footer = QFrame()
+        footer.setObjectName("AppFooter")
+        layout = QHBoxLayout(footer)
+        layout.setContentsMargins(12, 3, 12, 3)
+        layout.setSpacing(8)
+
+        self.footer_label = QLabel(FOOTER_TEXT)
+        self.footer_label.setObjectName("FooterText")
+        self.footer_label.setAlignment(Qt.AlignCenter)
+
+        layout.addStretch(1)
+        layout.addWidget(self.footer_label)
+        layout.addStretch(1)
+        return footer
 
     def _build_offline_tab(self) -> QWidget:
         tab = QWidget()
@@ -456,7 +475,9 @@ class MainWindow(QMainWindow):
         seconds, ms = divmod(rem, 1000)
         return f"{minutes:02d}:{seconds:02d}.{ms:03d}"
 
-    def _analysis_params(self) -> OfflineAnalysisParameters:
+    def _analysis_params(self) -> object:
+        from bpm_light_mapper.app.audio.offline_analyzer import OfflineAnalysisParameters
+
         params = OfflineAnalysisParameters(
             window_seconds=self.window_spin.value(),
             hop_seconds=self.hop_spin.value(),

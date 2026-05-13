@@ -19,6 +19,7 @@ Pensada para preproduccion y operacion de iluminacion:
 - Guardia live para evitar lecturas 3:2 tipo `120 BPM -> 80 BPM` en material electronico estable
 - Rango LIVE amplio por defecto `35-240` para que `Use main` no fuerce 60/70 BPM a double-time
 - Filtro LIVE de rebotes de click para que metronomos lentos no caigan en double-time
+- Branding BeatScope con logo, icono de aplicacion, splash de carga y footer de autoria dinamico
 
 ## Stack
 
@@ -45,10 +46,16 @@ python main.py
 
 ## Ejecutable Windows
 
-Build recomendado con PyInstaller en formato carpeta (`onedir`):
+Build recomendado con PyInstaller en formato carpeta (`onedir`). Es el modo principal porque abre mas rapido que `onefile` y evita extracciones temporales grandes en cada arranque:
 
 ```powershell
 .\tools\build_windows.ps1 -Clean
+```
+
+Tambien se puede usar el wrapper:
+
+```bat
+build_onedir.bat
 ```
 
 Si PowerShell bloquea scripts:
@@ -65,6 +72,30 @@ dist\BeatScope\BeatScope.exe
 
 Distribuye la carpeta completa `dist\BeatScope`, no solo el `.exe`.
 Ver detalles y checklist en [docs/PACKAGING.md](docs/PACKAGING.md).
+
+Build opcional `onefile`:
+
+```powershell
+.\tools\build_windows.ps1 -Clean -Onefile
+```
+
+o:
+
+```bat
+build_onefile.bat
+```
+
+Salida:
+
+```text
+dist\BeatScope.exe
+```
+
+El tamano grande del ejecutable/carpeta es normal: BeatScope incluye Qt, audio, DSP numerico y graficos.
+
+## Branding y assets
+
+Los assets publicos viven en `BeatScope_brand_assets/`. La aplicacion carga desde ahi el logo, icono y splash, con fallback seguro si falta algun archivo. El footer y los textos del splash muestran el ano actual dinamicamente junto a `Jose Osuna` y `www.joseosuna.com`.
 
 ## Formatos soportados
 

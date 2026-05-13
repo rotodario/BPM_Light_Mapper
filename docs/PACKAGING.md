@@ -32,8 +32,16 @@ python -m pip install --upgrade pip
 
 ## Build Command
 
+Recommended `onedir` build:
+
 ```powershell
 .\tools\build_windows.ps1 -Clean
+```
+
+or:
+
+```bat
+build_onedir.bat
 ```
 
 If PowerShell blocks script execution on the machine, run it with a temporary execution-policy bypass:
@@ -56,13 +64,19 @@ dist\BeatScope\BeatScope.exe
 .\tools\build_windows.ps1 -Clean -Onefile
 ```
 
+or:
+
+```bat
+build_onefile.bat
+```
+
 Output:
 
 ```text
 dist\BeatScope.exe
 ```
 
-This uses [BeatScope_onefile.spec](../BeatScope_onefile.spec), embeds the BeatScope icon and bundles `BeatScope_brand_assets` so the logo and PNG/ICO resources are available through the same `_MEIPASS` resource helper used by the app.
+This uses [BeatScope_onefile.spec](../BeatScope_onefile.spec), embeds the BeatScope icon, uses `BeatScope_brand_assets/beatscope_splash.png` for the PyInstaller splash screen, and bundles `BeatScope_brand_assets` so the logo and PNG/ICO resources are available through the same `_MEIPASS` resource helper used by the app.
 
 Keep `onedir` as the recommended release build until `onefile` has been tested on clean Windows machines. Scientific/audio stacks plus Qt plugins can be more fragile when extracted to PyInstaller's temporary runtime directory.
 
@@ -73,8 +87,11 @@ The spec file includes:
 - project Python modules
 - PySide6 data/plugins collected by PyInstaller hooks
 - `librosa`, `numpy`, `scipy`, `sounddevice`, `soundfile`, `pyqtgraph`
-- test audio fixtures for the `Cargar Test` dropdown
 - BeatScope brand assets and application icon
+- PyInstaller splash image when `BeatScope_brand_assets/beatscope_splash.png` exists
+- runtime splash status text with the current-year author credit from the app branding module
+
+Synthetic test WAV fixtures are not bundled in production builds by default. They are useful during development and validation, but add significant size to the executable folder. In packaged builds, `Cargar Test` will simply report that the fixture folder is not available.
 
 ## Build Failure Notes
 
@@ -88,6 +105,7 @@ If folders are created but there is no executable, inspect the PyInstaller error
 - PowerShell execution policy blocking the script
 
 The project spec excludes optional packages that are not used by BeatScope to avoid pulling broken or huge dependencies into the bundle.
+The current explicit exclusions are limited to unrelated notebook/ML/plotting/test stacks, optional documentation/network/image packages pulled by third-party hooks, alternate Qt bindings, Tkinter and Qt WebEngine modules. BeatScope still bundles the libraries it actually uses for UI, audio, DSP and plotting.
 
 ## What Is Not Guaranteed By Packaging
 

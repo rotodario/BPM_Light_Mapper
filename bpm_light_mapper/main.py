@@ -2,24 +2,37 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from bpm_light_mapper.app.ui.brand_assets import APP_NAME, window_icon
-from bpm_light_mapper.app.ui.main_window import MainWindow
+from bpm_light_mapper.app.ui.brand_assets import APP_NAME, AUTHOR_CREDIT, window_icon
 from bpm_light_mapper.app.ui.theme import apply_theme
 from bpm_light_mapper.app.utils.logging_utils import get_logger, install_exception_hooks, setup_logging
+from bpm_light_mapper.app.utils.splash import splash_close, splash_update
+
+
+def startup_status(text: str) -> None:
+    splash_update(f"{text}  |  {AUTHOR_CREDIT}")
 
 
 def main() -> int:
+    startup_status("Inicializando BeatScope...")
     setup_logging()
     install_exception_hooks()
     logger = get_logger("main")
     logger.info("Starting %s", APP_NAME)
+    startup_status("Cargando interfaz...")
     app = QApplication(sys.argv)
     icon = window_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)
+    startup_status("Preparando motor de audio...")
     apply_theme(app)
+    startup_status("Preparando analisis BPM...")
+    from bpm_light_mapper.app.ui.main_window import MainWindow
+
+    startup_status("Iniciando graficos...")
     window = MainWindow()
     window.show()
+    startup_status("Listo")
+    splash_close()
     exit_code = app.exec()
     logger.info("Application exited with code %s", exit_code)
     return exit_code
