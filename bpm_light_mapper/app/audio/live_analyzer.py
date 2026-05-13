@@ -421,6 +421,7 @@ class LiveBpmAnalyzer:
         onset_env, _ = compute_onset_envelope(samples, self.sample_rate, hop_length=self.hop_length)
         if len(onset_env) < 12 or np.max(onset_env) <= 1e-6:
             return 0.0, 0.0
+        onset_env = self._suppress_close_onset_repeats(onset_env)
         novelty = onset_env.astype(float) - float(np.mean(onset_env))
         novelty *= np.hanning(len(novelty))
         corr = np.correlate(novelty, novelty, mode="full")[len(novelty) - 1 :]
@@ -457,6 +458,25 @@ class LiveBpmAnalyzer:
         bpm = self._resolve_octave_by_peak_spacing(onset_env, bpm)
         confidence = (normalized_peak * 0.50) + (contrast * 0.25) + (energy_score * 0.25)
         return float(np.clip(bpm, self.bpm_min, self.bpm_max)), float(np.clip(confidence, 0.0, 1.0))
+
+    def _suppress_close_onset_repeats(self, onset_env: np.ndarray) -> np.ndarray:
+        """Remove very close repeated onset peaks that often come from click/reverb tails.
+
+        This protects slow metronomes and sparse click-like sources from being
+        interpreted as double-time while preserving normal musical beat spacing.
+        """
+        env = np.asarray(onset_env, dtype=float)
+        if len(env) < 8 or np.max(env) <= 1e-9:
+            return onset_env
+        distance = max(1, int(round(0.16 * self.sample_rate / self.hop_length)))
+        peaks, _ = find_peaks(env, distance=distance, prominence=max(0.02, float(np.max(env)) * 0.05))
+        if len(peaks) < 3:
+            return onset_env
+        cleaned = np.zeros_like(env)
+        cleaned[peaks] = env[peaks]
+        # Keep a small floor of the original envelope so broad musical energy is
+        # not completely discarded, but close click tails stop dominating timing.
+        return np.maximum(cleaned, env * 0.08)
 
     def _resolve_techno_three_two_subdivision(self, corr: np.ndarray, bpm: float) -> float:
         """Promote common 80->120 metrical errors when the faster grid is supported.

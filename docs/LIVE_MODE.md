@@ -29,6 +29,7 @@ It should help an operator answer:
 - non-blocking live startup so device errors should return to the UI instead of freezing it
 - half-time / detected / double-time candidate display and selection
 - preferred BPM range presets for slow, normal and fast material
+- default wide live range `35-240` so `Use main` can represent slow and fast material without forced octave folding
 
 ## Runtime Architecture
 
@@ -60,6 +61,9 @@ Live mode evaluates candidate tempos around the detected value:
 Use the candidate buttons when the useful lighting clock differs from the detected rhythmic subdivision.
 For example, a 60 BPM groove with hats can produce a strong 120 BPM detection; selecting half-time keeps the display and timing grid aligned to 60 BPM.
 
+By default, live mode starts in `Wide 35-240`, so a clean 60 BPM metronome should appear as main `60`, not as main `120`.
+The narrower range presets are still available when an operator explicitly wants to constrain detection for a specific show context.
+
 ## 3:2 Techno Subdivision Guard
 
 Some steady 4/4 electronic tracks around 120 BPM can produce a strong correlation peak near 80 BPM because of phrase/accent spacing.
@@ -73,6 +77,13 @@ Live mode now applies a narrow guard for that case:
 then the displayed live BPM is promoted to the faster lighting-useful clock.
 
 This is intentionally limited so genuine slow material is not blindly multiplied.
+
+## Slow Metronome / Click Guard
+
+Some metronome apps and click tracks produce two very close transients per pulse: the main click plus a short tail/rebound.
+If those close repeats dominate the onset envelope, a 60-70 BPM click can be interpreted as double-time.
+
+The live estimator suppresses very close repeated onset peaks before tempo estimation. This keeps `Use main` aligned with the actual slow click instead of forcing the operator to select `Use half`.
 
 ## Detection States
 
@@ -183,11 +194,14 @@ This is useful when you want to program chases, strobes or bumps against a faste
 
 The live metronome is a display-only pulse. It follows the BPM currently shown after candidate selection, tap lock or half-time normalization.
 
+The LED uses meter-style ballistics rather than a binary blink. On each beat it attacks nearly instantly, then its `led_intensity` decays from the real last-beat time with an exponential release. The decay is capped by the current beat interval, so high BPM values do not leave the LED permanently lit.
+
 It is intentionally visual only:
 
 - no audio click is generated
 - it does not touch the audio callback
-- it is rendered from the UI timer to avoid adding latency or driver risk
+- it is rendered from one UI frame timer to avoid adding latency or driver risk
+- glow, color and subtle bloom are proportional to current LED intensity
 
 ## Limitations
 

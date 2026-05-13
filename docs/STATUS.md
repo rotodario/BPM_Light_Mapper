@@ -8,7 +8,7 @@
 - global BPM estimation
 - half-time/detected/double-time tempo candidate scoring
 - beat detection
-- visual metronome for offline beat-grid/playhead validation
+- visual metronome for offline beat-grid/playhead validation with ballistic LED decay
 - local BPM window analysis
 - tempo-zone segmentation with contiguous non-overlapping boundaries
 - segment table editing
@@ -26,7 +26,7 @@
 - optimized live waveform envelope using bounded min/max reduction
 - live tempo candidate selection for half-time/double-time ambiguity
 - live confidence and state labels
-- visual live metronome driven by displayed BPM
+- visual live metronome driven by displayed BPM with proportional glow and high-BPM decay limiting
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
 - dark styled dropdowns for test loading and live input selection

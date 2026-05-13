@@ -823,7 +823,13 @@ class MainWindow(QMainWindow):
         interval = max(1e-6, next_beat - current_beat)
         phase = (seconds - current_beat) / interval
         next_ms = int(max(0.0, next_beat - seconds) * 1000)
-        self.offline_metronome.set_active(True, f"Beat {index + 1}", f"next {next_ms} ms", phase)
+        self.offline_metronome.set_active(
+            True,
+            f"Beat {index + 1}",
+            f"next {next_ms} ms",
+            phase,
+            beat_interval=interval,
+        )
 
     def refresh_segment_view(self) -> None:
         if self.analysis_result is None:

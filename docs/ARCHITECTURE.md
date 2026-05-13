@@ -68,6 +68,7 @@ bpm_light_mapper/
   - opens selected input device
   - writes incoming audio into a bounded ring buffer
   - performs rolling live tempo estimation in a worker thread
+  - suppresses very close repeated onset peaks so click tails do not force slow metronomes into double-time
   - applies a narrow 3:2 subdivision guard for common 120 BPM electronic material misread near 80 BPM
   - prepares reduced min/max waveform data for live rendering
   - smooths BPM history
@@ -119,7 +120,7 @@ bpm_light_mapper/
   - rolling BPM display
   - fixed-rate UI rendering with `QTimer`
   - optimized live waveform envelope from reduced min/max data
-  - visual metronome derived from the displayed live BPM
+  - visual metronome derived from the displayed live BPM and beat interval
   - tap tempo
   - manual lock
   - BPM x and BPM / lighting timing grid
@@ -132,6 +133,7 @@ bpm_light_mapper/
 
 - `metric_card.py`, `status_badge.py`, `section_panel.py`, `timing_grid.py`, `metronome_indicator.py`
   - reusable HUD components for prominent BPM, confidence, status, timing and visual beat pulse displays
+  - metronome LED rendering uses a single UI frame timer, real beat timing, exponential release and proportional glow instead of ON/OFF stylesheet blinking
 
 ### `app/export`
 

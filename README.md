@@ -9,13 +9,15 @@ Pensada para preproduccion y operacion de iluminacion:
 - BPM global con confianza
 - candidatos half-time / detected / double-time
 - Beat grid visual
-- Metronomo visual offline/live para validar el pulso sin generar click audible
+- Metronomo visual offline/live con LED balistico para validar el pulso sin generar click audible
 - Zonas con cambios de tempo
 - Correccion manual de segmentos
 - Exportacion a JSON, CSV y TXT
 - Deteccion live con estado `searching`, `unstable`, `locked`
 - `LOCKED` en live prioriza estabilidad operativa para iluminacion; half/double-time se resuelve con candidatos seleccionables
 - Guardia live para evitar lecturas 3:2 tipo `120 BPM -> 80 BPM` en material electronico estable
+- Rango LIVE amplio por defecto `35-240` para que `Use main` no fuerce 60/70 BPM a double-time
+- Filtro LIVE de rebotes de click para que metronomos lentos no caigan en double-time
 
 ## Stack
 

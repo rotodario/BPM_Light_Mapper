@@ -76,7 +76,7 @@ class LivePanel(QWidget):
         top = QHBoxLayout()
         self.device_combo = QComboBox()
         self.range_combo = QComboBox()
-        self.range_combo.addItems(["Normal 80-160", "Slow 50-90", "Fast 140-200", "Custom 35-240"])
+        self.range_combo.addItems(["Wide 35-240", "Normal 80-160", "Slow 50-90", "Fast 140-200"])
         self.refresh_button = QPushButton("Refrescar")
         self.start_button = QPushButton("Iniciar LIVE")
         self.start_button.setProperty("role", "primary")
@@ -451,13 +451,19 @@ class LivePanel(QWidget):
         if beat_index != self.metronome_beat_count:
             self.metronome_beat_count = beat_index
         next_ms = int((1.0 - phase) * beat_seconds * 1000)
-        self.live_metronome.set_active(True, f"Beat {beat_index + 1}", f"next {next_ms} ms", phase)
+        self.live_metronome.set_active(
+            True,
+            f"Beat {beat_index + 1}",
+            f"next {next_ms} ms",
+            phase,
+            beat_interval=beat_seconds,
+        )
 
     def _live_bpm_range(self) -> tuple[float, float]:
         ranges = {
             "Slow 50-90": (50.0, 90.0),
             "Normal 80-160": (80.0, 160.0),
             "Fast 140-200": (140.0, 200.0),
-            "Custom 35-240": (35.0, 240.0),
+            "Wide 35-240": (35.0, 240.0),
         }
         return ranges.get(self.range_combo.currentText(), (35.0, 240.0))
