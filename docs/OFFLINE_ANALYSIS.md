@@ -10,13 +10,14 @@ This is the core value for lighting preproduction.
 
 1. file load
 2. mono conversion for analysis
-3. onset envelope extraction
-4. beat detection
-5. global tempo estimation
-6. local tempo estimation in sliding windows
-7. segment grouping and smoothing
-8. manual correction in UI
-9. export
+3. musical onset envelope extraction from spectral flux bands
+4. BPM candidate estimation from autocorrelation/tempogram evidence
+5. musical half/double-time scoring
+6. beat-grid construction and onset snapping
+7. local tempo estimation in sliding windows
+8. segment grouping and smoothing
+9. manual correction in UI
+10. export
 
 ## Step-by-Step
 
@@ -32,40 +33,65 @@ Responsibilities:
 - preserve metadata
 - normalize to a mono analysis signal
 
-## 2. Onset Envelope
+## 2. Musical Onset Envelope
 
 Handled by:
 
-- [beat_tracker.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/beat_tracker.py:7)
+- [offline_rhythm_analyzer.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/offline_rhythm_analyzer.py:1)
 
 Purpose:
 
-- estimate per-frame onset strength
-- capture rhythmic energy over time
+- estimate per-frame musical onset strength
+- emphasize transient/percussive changes instead of raw waveform amplitude
+- reduce the influence of sustained vocals, pads, bass and reverb tails
 
 Why it matters:
 
 - tempo estimation is more reliable from rhythmic energy than from raw waveform amplitude
 
-## 3. Beat Detection
+Current approach:
+
+- normalize the full mono analysis signal
+- compute an STFT once for the file
+- derive positive spectral flux in several bands:
+  - low band for kick-like movement
+  - mid band for snare, claps and body transients
+  - high band for hats and sharp attacks
+  - broadband/transient envelopes for general rhythmic changes
+- combine and normalize those envelopes into one offline onset envelope
+
+This is deliberately separate from Live, which must stay causal and low latency.
+
+## 3. BPM Candidates
 
 Handled by:
 
-- [beat_tracker.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/beat_tracker.py:7)
+- [offline_rhythm_analyzer.py](/F:/Descargas/bpm_detec/bpm_light_mapper/app/audio/offline_rhythm_analyzer.py:1)
 
 Output:
 
-- estimated beat times
-- base tempo estimate
-
-These beats are visualized in the timeline and later included in exports.
+- primary BPM candidate
+- half-time and double-time alternatives
+- candidate confidence components
+- diagnostic summary
 
 Current approach:
 
-- detect onset peaks independently from the first tempo estimate
-- estimate BPM from robust intervals between peaks
-- refine peak positions against the waveform to reduce frame quantization error
-- keep half-time/double-time candidates visible instead of pretending there is only one answer
+- compute autocorrelation over the combined onset envelope
+- extract several candidate periodicities, not only one maximum
+- refine autocorrelation lag with sub-frame interpolation
+- score each candidate by:
+  - onset/grid alignment
+  - accent alignment
+  - interval stability
+  - tempogram strength
+- prefer musically plausible candidates without hiding ambiguity
+
+## 3.1 Beat Grid
+
+After choosing a BPM, the offline analyzer builds a regular beat grid and snaps each beat to a nearby strong onset when that improves alignment. This keeps the grid stable while still allowing small timing deviations in material that is not perfectly quantized.
+
+The first beat is stored as the estimated downbeat anchor when available.
 
 ## 4. Global BPM
 
@@ -78,6 +104,8 @@ The global BPM is derived from the onset representation and summarized as:
 - primary BPM
 - candidate related BPMs
 - confidence
+- estimated downbeat
+- diagnostic summary
 - warnings
 
 This is intentionally not treated as the whole truth for the song.
@@ -111,7 +139,7 @@ Handled by:
 Method:
 
 - analyze overlapping windows through time
-- compute local BPM for each valid window
+- compute local BPM from the local onset envelope, not from the global beat grid
 - estimate local confidence
 
 This allows the app to detect tempo changes and stable sections.

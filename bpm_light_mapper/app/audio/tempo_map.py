@@ -50,6 +50,40 @@ def _estimate_local_bpm_from_beats(
     return float(np.clip(bpm, bpm_min, bpm_max))
 
 
+def _estimate_local_bpm_from_onset_env(
+    onset_env: np.ndarray,
+    frame_step: float,
+    bpm_min: float,
+    bpm_max: float,
+) -> float | None:
+    if len(onset_env) < 8 or frame_step <= 0.0 or float(np.max(onset_env)) <= 1e-9:
+        return None
+    novelty = onset_env.astype(float) - float(np.mean(onset_env))
+    corr = np.correlate(novelty, novelty, mode="full")[len(novelty) - 1 :]
+    lag_min = max(1, int(np.floor((60.0 / bpm_max) / frame_step)))
+    lag_max = min(len(corr) - 1, int(np.ceil((60.0 / bpm_min) / frame_step)))
+    if lag_max <= lag_min:
+        return None
+    local = corr[lag_min : lag_max + 1]
+    if len(local) == 0 or float(np.max(local)) <= 1e-9:
+        return None
+    peak_index = int(np.argmax(local))
+    lag = lag_min + peak_index
+    if 0 < lag < len(corr) - 1:
+        left = float(corr[lag - 1])
+        center = float(corr[lag])
+        right = float(corr[lag + 1])
+        denom = left - (2.0 * center) + right
+        if abs(denom) > 1e-12:
+            lag = float(lag) + float(np.clip(0.5 * (left - right) / denom, -0.5, 0.5))
+    bpm = 60.0 / (float(lag) * frame_step)
+    while bpm < bpm_min and bpm > 0:
+        bpm *= 2.0
+    while bpm > bpm_max:
+        bpm /= 2.0
+    return float(np.clip(bpm, bpm_min, bpm_max))
+
+
 def generate_tempo_map(
     waveform: np.ndarray,
     sample_rate: int,
@@ -65,6 +99,7 @@ def generate_tempo_map(
 
     hop_length = max(1, int(round((len(waveform) / sample_rate) / max(len(onset_envelope), 1) * sample_rate)))
     times = np.arange(len(onset_envelope), dtype=float) * hop_length / sample_rate
+    frame_step = float(hop_length / sample_rate)
     windows: list[dict] = []
     total_windows = max(1, int(np.ceil(duration / max(params.hop_seconds, 1e-9))))
     window_index = 0
@@ -76,9 +111,11 @@ def generate_tempo_map(
         mask = (times >= start) & (times < end)
         beat_mask = (beat_times >= start) & (beat_times < end)
         local_beats = beat_times[beat_mask]
-        if mask.sum() >= 4 and len(local_beats) >= 4:
+        if mask.sum() >= 8:
             local_env = onset_envelope[mask]
-            bpm = _estimate_local_bpm_from_beats(local_beats, params.bpm_min, params.bpm_max)
+            bpm = _estimate_local_bpm_from_onset_env(local_env, frame_step, params.bpm_min, params.bpm_max)
+            if bpm is None:
+                bpm = _estimate_local_bpm_from_beats(local_beats, params.bpm_min, params.bpm_max)
             if bpm is None:
                 start += params.hop_seconds
                 window_index += 1

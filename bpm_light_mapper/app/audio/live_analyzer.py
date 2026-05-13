@@ -32,6 +32,8 @@ class LiveUpdate:
 class LiveVisualState:
     level: float
     peak: float
+    rms_db: np.ndarray
+    peak_db: np.ndarray
     waveform_min: np.ndarray
     waveform_max: np.ndarray
     timestamp: float
@@ -79,6 +81,8 @@ class LiveBpmAnalyzer:
         self.latest_visual = LiveVisualState(
             level=0.0,
             peak=0.0,
+            rms_db=np.array([-60.0], dtype=np.float32),
+            peak_db=np.array([-60.0], dtype=np.float32),
             waveform_min=np.zeros(self.waveform_columns, dtype=np.float32),
             waveform_max=np.zeros(self.waveform_columns, dtype=np.float32),
             timestamp=0.0,
@@ -207,6 +211,8 @@ class LiveBpmAnalyzer:
             return LiveVisualState(
                 level=self.latest_visual.level,
                 peak=self.latest_visual.peak,
+                rms_db=self.latest_visual.rms_db.copy(),
+                peak_db=self.latest_visual.peak_db.copy(),
                 waveform_min=self.latest_visual.waveform_min.copy(),
                 waveform_max=self.latest_visual.waveform_max.copy(),
                 timestamp=self.latest_visual.timestamp,
@@ -244,14 +250,38 @@ class LiveBpmAnalyzer:
         if samples.size == 0:
             min_values = np.zeros(self.waveform_columns, dtype=np.float32)
             max_values = np.zeros(self.waveform_columns, dtype=np.float32)
-            return LiveVisualState(0.0, 0.0, min_values, max_values, now)
+            silence_db = np.array([-60.0], dtype=np.float32)
+            return LiveVisualState(0.0, 0.0, silence_db, silence_db, min_values, max_values, now)
 
-        peak = float(np.max(np.abs(samples)))
-        rms = float(np.sqrt(np.mean(np.square(samples))))
+        peak, rms, peak_db, rms_db = self._meter_levels(samples)
         min_values, max_values = self._min_max_envelope(samples, self.waveform_columns)
         level = (self.latest_level * 0.80) + (rms * 0.20)
         peak_hold = max(peak, self.latest_peak * 0.92)
-        return LiveVisualState(level, peak_hold, min_values, max_values, now)
+        return LiveVisualState(level, peak_hold, rms_db, peak_db, min_values, max_values, now)
+
+    @staticmethod
+    def _meter_levels(samples: np.ndarray) -> tuple[float, float, np.ndarray, np.ndarray]:
+        values = np.asarray(samples, dtype=np.float32)
+        if values.ndim == 1:
+            channel_values = values.reshape(-1, 1)
+        else:
+            channel_values = values.reshape(values.shape[0], -1)
+        abs_values = np.abs(channel_values)
+        peak_by_channel = np.max(abs_values, axis=0)
+        rms_by_channel = np.sqrt(np.mean(np.square(channel_values), axis=0))
+        peak_db = LiveBpmAnalyzer._amplitude_to_dbfs(peak_by_channel)
+        rms_db = LiveBpmAnalyzer._amplitude_to_dbfs(rms_by_channel)
+        return (
+            float(np.max(peak_by_channel)),
+            float(np.max(rms_by_channel)),
+            peak_db.astype(np.float32),
+            rms_db.astype(np.float32),
+        )
+
+    @staticmethod
+    def _amplitude_to_dbfs(values: np.ndarray) -> np.ndarray:
+        safe_values = np.maximum(np.asarray(values, dtype=np.float32), 1e-9)
+        return np.maximum(20.0 * np.log10(safe_values), -60.0)
 
     @staticmethod
     def _min_max_envelope(samples: np.ndarray, columns: int) -> tuple[np.ndarray, np.ndarray]:

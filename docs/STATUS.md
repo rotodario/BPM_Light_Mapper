@@ -5,9 +5,9 @@
 - modular Python project structure
 - desktop UI with PySide6
 - offline file loading for WAV/FLAC/AIFF and MP3 fallback path
-- global BPM estimation
+- global BPM estimation with a dedicated offline spectral-flux/tempogram pipeline
 - half-time/detected/double-time tempo candidate scoring
-- beat detection
+- beat-grid detection with onset snapping and diagnostic confidence
 - visual metronome for offline beat-grid/playhead validation with ballistic LED decay
 - local BPM window analysis
 - tempo-zone segmentation with contiguous non-overlapping boundaries
@@ -24,6 +24,7 @@
 - live 3:2 subdivision guard for 120 BPM electronic material misread near 80 BPM
 - fixed-rate live UI render loop decoupled from audio/DSP updates
 - optimized live waveform envelope using bounded min/max reduction
+- professional dBFS input meter with RMS ballistics, peak hold and clip latch
 - live tempo candidate selection for half-time/double-time ambiguity
 - live confidence and state labels
 - visual live metronome driven by displayed BPM with proportional glow and high-BPM decay limiting

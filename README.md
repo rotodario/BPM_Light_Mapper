@@ -9,6 +9,7 @@ Pensada para preproduccion y operacion de iluminacion:
 - BPM global con confianza
 - candidatos half-time / detected / double-time
 - Beat grid visual
+- Pipeline offline separado del Live con spectral flux multibanda, tempogram, diagnostico y beat grid
 - Metronomo visual offline/live con LED balistico para validar el pulso sin generar click audible
 - Zonas con cambios de tempo
 - Correccion manual de segmentos
@@ -94,7 +95,7 @@ La UI offline esta organizada como panel tecnico:
 ## Modo live
 
 - Seleccion de dispositivo de entrada
-- Medidor de nivel
+- Medidor de nivel dBFS con RMS, peak hold e indicador de clip
 - BPM rolling con historial
 - Estado de bloqueo
 - Tap tempo manual

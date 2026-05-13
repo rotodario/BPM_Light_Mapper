@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QSizePolicy,
     QPushButton,
-    QProgressBar,
     QVBoxLayout,
     QWidget,
 )
 
 from bpm_light_mapper.app.audio.live_analyzer import LiveBpmAnalyzer, LiveUpdate
+from bpm_light_mapper.app.ui.input_level_meter import InputLevelMeter
 from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
 from bpm_light_mapper.app.ui.section_panel import SectionPanel
@@ -129,10 +129,7 @@ class LivePanel(QWidget):
         self.live_detected_button = QPushButton("Use main")
         self.live_double_button = QPushButton("Use double")
         self.live_detected_button.setProperty("role", "primary")
-        self.level_bar = QProgressBar()
-        self.level_bar.setRange(0, 100)
-        self.level_bar.setMaximumHeight(12)
-        self.level_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.level_meter = InputLevelMeter()
         level_panel = SectionPanel("Nivel entrada")
         level_panel.layout().setContentsMargins(8, 5, 8, 8)
         level_panel.layout().setSpacing(4)
@@ -141,7 +138,7 @@ class LivePanel(QWidget):
         level_panel.body.setSpacing(4)
         level_panel.layout().setStretch(0, 0)
         level_panel.layout().setStretch(1, 0)
-        level_panel.body.addWidget(self.level_bar)
+        level_panel.body.addWidget(self.level_meter)
         self.waveform_plot = pg.PlotWidget()
         self.waveform_plot.setBackground(COLORS["bg"])
         self.waveform_plot.setMouseEnabled(x=False, y=False)
@@ -314,6 +311,8 @@ class LivePanel(QWidget):
         self.live_metronome.set_active(False)
         self.conf_card.set_value("0.00")
         self.live_candidates_card.set_value("-")
+        self.level_meter.set_levels([-60.0], [-60.0])
+        self.level_meter.reset_clip()
         self.history_display[:] = np.nan
         self.history_curve.setData(self.history_x, self.history_display)
         self.log_message.emit("LIVE detenido.")
@@ -352,7 +351,7 @@ class LivePanel(QWidget):
                 self.waveform_x = np.arange(len(visual.waveform_min), dtype=float)
             self.waveform_min_curve.setData(self.waveform_x, visual.waveform_min)
             self.waveform_max_curve.setData(self.waveform_x, visual.waveform_max)
-        self.level_bar.setValue(int(max(0.0, min(1.0, visual.level * 8.0)) * 100))
+        self.level_meter.set_levels(visual.rms_db, visual.peak_db)
 
     def _apply_live_update(self, update: LiveUpdate) -> None:
         self._ingest_live_update(update)

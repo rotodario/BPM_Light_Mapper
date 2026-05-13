@@ -41,20 +41,25 @@ bpm_light_mapper/
   - keeps sample-rate and channel information
 
 - `beat_tracker.py`
-  - computes onset envelope
-  - detects beats
-  - refines detected peak times against the waveform to reduce frame quantization error
-  - estimates BPM from robust peak intervals
-  - estimates beat consistency confidence
+  - legacy/simple onset and beat helpers used by supporting code and tests
+
+- `offline_rhythm_analyzer.py`
+  - dedicated non-causal offline rhythm pipeline, separate from Live
+  - computes spectral-flux onset envelopes from full, transient, low, mid and high bands
+  - estimates multiple BPM candidates from onset autocorrelation/tempogram evidence
+  - scores candidates by onset alignment, accent strength, interval stability and tempogram strength
+  - creates a beat grid from the selected BPM and snaps beats to nearby strong onsets
+  - returns confidence, downbeat estimate and a short diagnostic summary
 
 - `offline_analyzer.py`
   - orchestrates the full offline analysis flow
   - computes global BPM and candidate multiples/divisions
+  - stores offline diagnostics and downbeat estimate in `AnalysisResult`
   - emits warnings for tempo ambiguity
   - builds the final `AnalysisResult`
 
 - `tempo_map.py`
-  - computes local tempo over sliding windows
+  - computes local tempo over sliding windows from the local onset envelope
   - groups windows into stable BPM segments
   - applies smoothing and minimum segment duration heuristics
   - converts overlapping analysis windows into non-overlapping displayed/exported segment boundaries
@@ -120,6 +125,7 @@ bpm_light_mapper/
   - rolling BPM display
   - fixed-rate UI rendering with `QTimer`
   - optimized live waveform envelope from reduced min/max data
+  - dBFS input meter fed by the latest visual state, with UI-side ballistics and clip hold
   - visual metronome derived from the displayed live BPM and beat interval
   - tap tempo
   - manual lock
@@ -131,8 +137,9 @@ bpm_light_mapper/
   - dark styling for menus and combo dropdown popups
   - shared style helpers for status and action controls
 
-- `metric_card.py`, `status_badge.py`, `section_panel.py`, `timing_grid.py`, `metronome_indicator.py`
+- `metric_card.py`, `status_badge.py`, `section_panel.py`, `timing_grid.py`, `metronome_indicator.py`, `input_level_meter.py`
   - reusable HUD components for prominent BPM, confidence, status, timing and visual beat pulse displays
+  - input level meter maps RMS/peak values to dBFS, draws fixed scale zones, peak markers and clip latches
   - metronome LED rendering uses a single UI frame timer, real beat timing, exponential release and proportional glow instead of ON/OFF stylesheet blinking
 
 ### `app/export`

@@ -46,9 +46,24 @@ Key rules:
 - waveform/level visual data is reduced in a separate visual loop
 - the UI renders from the latest processed state with a fixed `QTimer`
 - the waveform uses min/max columns instead of drawing every sample
+- the input meter receives RMS and peak values in dBFS, then applies its own display ballistics
 - buffers and histories have bounded sizes
 
 This means the UI should remain responsive even if BPM analysis is temporarily expensive.
+
+## Input Level Meter
+
+The live input meter is a dBFS instrument meter, not a linear volume bar. The visual loop calculates block RMS and peak, converts both with `20 * log10(value)` and clamps the visible range to `-60 dBFS` through `0 dBFS`.
+
+The widget renders at the UI frame rate and keeps its own meter state:
+
+- fast attack and slower release for the displayed RMS level
+- independent current peak marker
+- peak hold marker that stays briefly before falling
+- clip latch when peak reaches the top of digital scale
+- green, orange and red zones based on dBFS thresholds
+
+The audio callback does not paint the meter and does not create UI objects.
 
 ## Half-Time / Double-Time
 

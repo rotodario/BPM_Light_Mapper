@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
-from typing import Any
+from typing import Any, Optional
 
 from bpm_light_mapper.app.models.segment import Segment
 from bpm_light_mapper.app.models.tempo_candidate import TempoCandidate
@@ -24,6 +24,8 @@ class AnalysisResult:
     segments: list[Segment] = field(default_factory=list)
     parameters: dict[str, Any] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    diagnostic_summary: str = ""
+    downbeat_time: Optional[float] = None
     analyzed_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:

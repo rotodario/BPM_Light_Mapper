@@ -5,12 +5,8 @@ from datetime import datetime
 
 import numpy as np
 
-from bpm_light_mapper.app.audio.beat_tracker import (
-    beat_consistency_confidence,
-    detect_beats,
-)
 from bpm_light_mapper.app.audio.loader import load_audio
-from bpm_light_mapper.app.audio.tempo_candidate_resolver import resolve_tempo_candidates
+from bpm_light_mapper.app.audio.offline_rhythm_analyzer import analyze_offline_rhythm
 from bpm_light_mapper.app.audio.tempo_map import TempoMapParameters, generate_tempo_map
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.utils.logging_utils import get_logger, log_timing
@@ -42,28 +38,6 @@ def _bpm_candidates(bpm: float, bpm_min: float, bpm_max: float) -> list[float]:
     if bpm * 2 <= bpm_max * 2:
         values.add(round(bpm * 2, 2))
     return sorted(values)
-
-
-def _estimate_global_bpm_from_beats(
-    beat_times: np.ndarray,
-    fallback_bpm: float,
-    bpm_min: float,
-    bpm_max: float,
-) -> float:
-    if len(beat_times) < 4:
-        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
-    intervals = np.diff(beat_times)
-    if len(intervals) == 0:
-        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
-    median_interval = float(np.median(intervals))
-    if median_interval <= 0:
-        return float(np.clip(fallback_bpm, bpm_min, bpm_max))
-    bpm = 60.0 / median_interval
-    while bpm < bpm_min and bpm > 0:
-        bpm *= 2.0
-    while bpm > bpm_max:
-        bpm /= 2.0
-    return float(np.clip(bpm, bpm_min, bpm_max))
 
 
 def _check_canceled(should_cancel) -> None:
@@ -101,42 +75,26 @@ def analyze_file(
         )
 
     if progress_callback is not None:
-        progress_callback("detectando beats...")
-    with log_timing("offline.detect_beats", logger):
-        bpm_global, beat_times, onset_envelope, onset_times = detect_beats(
+        progress_callback("analisis ritmico offline: HPSS, onset multibanda y tempogram...")
+    with log_timing("offline.rhythm_analyzer", logger):
+        rhythm = analyze_offline_rhythm(
             waveform,
             sample_rate,
-            hop_length=params.hop_length,
-            start_bpm=params.start_bpm,
-            tightness=params.tightness,
-            bpm_min=params.bpm_min,
-            bpm_max=params.bpm_max,
-        )
-    _check_canceled(should_cancel)
-    onset_envelope = onset_envelope * params.onset_sensitivity
-
-    if progress_callback is not None:
-        progress_callback("estimando BPM global...")
-    with log_timing("offline.estimate_global_bpm", logger):
-        bpm_global = _estimate_global_bpm_from_beats(
-            beat_times,
-            bpm_global,
+            params.hop_length,
+            params.start_bpm,
+            params.tightness,
             params.bpm_min,
             params.bpm_max,
         )
-
-    confidence_global = beat_consistency_confidence(beat_times, bpm_global)
-    warnings: list[str] = []
+    _check_canceled(should_cancel)
+    bpm_global = rhythm.bpm
+    beat_times = rhythm.beat_times
+    onset_envelope = rhythm.onset_envelope * params.onset_sensitivity
+    onset_times = rhythm.onset_times
+    confidence_global = rhythm.confidence
+    warnings: list[str] = list(rhythm.warnings)
     candidates = _bpm_candidates(bpm_global, params.bpm_min, params.bpm_max)
-    tempo_candidates, candidate_warnings = resolve_tempo_candidates(
-        bpm_global,
-        beat_times,
-        onset_envelope,
-        onset_times,
-        params.bpm_min,
-        params.bpm_max,
-    )
-    warnings.extend(candidate_warnings)
+    tempo_candidates = rhythm.tempo_candidates
     if any(abs(candidate - bpm_global) > 15 for candidate in candidates if candidate != bpm_global):
         warnings.append("Posible ambiguedad half-time/double-time. Revisa candidatos alternativos.")
 
@@ -187,6 +145,8 @@ def analyze_file(
         segments=segments,
         parameters=asdict(params),
         warnings=warnings,
+        diagnostic_summary=rhythm.diagnostic_summary,
+        downbeat_time=rhythm.downbeat_time,
         analyzed_at=datetime.now().isoformat(timespec="seconds"),
     )
     return audio, result

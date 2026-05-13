@@ -660,6 +660,8 @@ class MainWindow(QMainWindow):
         self.waveform_widget.set_beats(result.beat_times)
         self.waveform_widget.set_segments(result.segments)
         self.segment_table.load_segments(result.segments)
+        if result.diagnostic_summary:
+            self.log(f"Diagnostico BPM: {result.diagnostic_summary}")
         if result.segments:
             self.selecting_from_waveform = True
             try:
