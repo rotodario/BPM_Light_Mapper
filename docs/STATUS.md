@@ -6,6 +6,7 @@
 - desktop UI with PySide6
 - offline file loading for WAV/FLAC/AIFF and MP3 fallback path
 - global BPM estimation
+- half-time/detected/double-time tempo candidate scoring
 - beat detection
 - local BPM window analysis
 - tempo-zone segmentation with contiguous non-overlapping boundaries
@@ -18,8 +19,10 @@
 - JSON/CSV/TXT export
 - live device listing
 - live BPM estimation with rolling history
+- live lock state based on operational BPM stability instead of requiring very high confidence
 - fixed-rate live UI render loop decoupled from audio/DSP updates
 - optimized live waveform envelope using bounded min/max reduction
+- live tempo candidate selection for half-time/double-time ambiguity
 - live confidence and state labels
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation

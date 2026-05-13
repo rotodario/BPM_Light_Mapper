@@ -63,6 +63,8 @@ class LivePanel(QWidget):
         self.target_confidence = 0.0
         self.display_confidence = 0.0
         self.target_state = "SEARCHING"
+        self.live_candidate_mode = "Detected"
+        self.latest_candidate_text = "-"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -70,6 +72,8 @@ class LivePanel(QWidget):
 
         top = QHBoxLayout()
         self.device_combo = QComboBox()
+        self.range_combo = QComboBox()
+        self.range_combo.addItems(["Normal 80-160", "Slow 50-90", "Fast 140-200", "Custom 35-240"])
         self.refresh_button = QPushButton("Refrescar")
         self.start_button = QPushButton("Iniciar LIVE")
         self.start_button.setProperty("role", "primary")
@@ -83,6 +87,8 @@ class LivePanel(QWidget):
         self.normalize_half_button.setChecked(False)
         top.addWidget(QLabel("INPUT"))
         top.addWidget(self.device_combo, 1)
+        top.addWidget(QLabel("RANGE"))
+        top.addWidget(self.range_combo)
         top.addWidget(self.refresh_button)
         top.addWidget(self.start_button)
         top.addWidget(self.stop_button)
@@ -107,10 +113,17 @@ class LivePanel(QWidget):
         bpm_layout.addWidget(self.state_badge)
         bpm_layout.addWidget(self.bpm_label)
         bpm_layout.addWidget(self.beat_label)
-        cockpit.addWidget(bpm_frame, 0, 0, 2, 2)
+        bpm_frame.setMaximumWidth(460)
+        bpm_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        cockpit.addWidget(bpm_frame, 0, 0, 2, 1)
 
         self.conf_card = MetricCard("Confianza", "0.00", compact=True)
         self.tap_card = MetricCard("Tap BPM", "-", compact=True)
+        self.live_candidates_card = MetricCard("Half / Main / Double", "-", compact=True)
+        self.live_half_button = QPushButton("Use half")
+        self.live_detected_button = QPushButton("Use main")
+        self.live_double_button = QPushButton("Use double")
+        self.live_detected_button.setProperty("role", "primary")
         self.level_bar = QProgressBar()
         self.level_bar.setRange(0, 100)
         self.level_bar.setMaximumHeight(12)
@@ -153,16 +166,37 @@ class LivePanel(QWidget):
         level_panel.body.addWidget(self.waveform_plot, 1)
         level_panel.body.setStretch(0, 0)
         level_panel.body.setStretch(1, 1)
-        cockpit.addWidget(self.conf_card, 0, 2)
-        cockpit.addWidget(self.tap_card, 1, 2)
-        cockpit.addWidget(level_panel, 2, 2)
+        cockpit.addWidget(self.conf_card, 0, 1)
+        cockpit.addWidget(self.tap_card, 1, 1)
+        candidate_panel = SectionPanel("Tempo candidates")
+        candidate_panel.layout().setContentsMargins(8, 5, 8, 8)
+        candidate_panel.layout().setSpacing(4)
+        candidate_panel.title_label.setMaximumHeight(14)
+        candidate_panel.body.setSpacing(6)
+        live_choice_row = QHBoxLayout()
+        live_choice_row.setSpacing(6)
+        live_choice_row.addWidget(self.live_half_button)
+        live_choice_row.addWidget(self.live_detected_button)
+        live_choice_row.addWidget(self.live_double_button)
+        candidate_panel.body.addWidget(self.live_candidates_card)
+        candidate_panel.body.addLayout(live_choice_row)
+        candidate_panel.setMinimumWidth(260)
+        candidate_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        cockpit.addWidget(candidate_panel, 0, 2, 2, 1)
+        cockpit.addWidget(level_panel, 2, 1, 1, 2)
 
         timing_panel = SectionPanel("Tiempos iluminacion")
         self.timing_grid = TimingGrid()
         timing_panel.body.addWidget(self.timing_grid)
-        timing_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        timing_panel.setMaximumWidth(460)
+        timing_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         level_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        cockpit.addWidget(timing_panel, 2, 0, 1, 2)
+        cockpit.addWidget(timing_panel, 2, 0)
+        cockpit.setColumnStretch(0, 0)
+        cockpit.setColumnMinimumWidth(1, 260)
+        cockpit.setColumnMinimumWidth(2, 260)
+        cockpit.setColumnStretch(1, 1)
+        cockpit.setColumnStretch(2, 1)
         layout.addLayout(cockpit)
 
         history_panel = SectionPanel("Historial BPM")
@@ -188,6 +222,9 @@ class LivePanel(QWidget):
         self.stop_button.clicked.connect(self.stop_live)
         self.tap_button.clicked.connect(self.handle_tap)
         self.lock_button.toggled.connect(self._toggle_manual_lock)
+        self.live_half_button.clicked.connect(lambda: self._set_live_candidate_mode("Half-time"))
+        self.live_detected_button.clicked.connect(lambda: self._set_live_candidate_mode("Detected"))
+        self.live_double_button.clicked.connect(lambda: self._set_live_candidate_mode("Double-time"))
         self.live_update_received.connect(self._apply_live_update)
         self.refresh_devices()
 
@@ -211,6 +248,8 @@ class LivePanel(QWidget):
             error_callback=self.log_message.emit,
             visual_interval=1.0 / 30.0,
             waveform_columns=len(self.waveform_x),
+            bpm_min=self._live_bpm_range()[0],
+            bpm_max=self._live_bpm_range()[1],
         )
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(False)
@@ -234,6 +273,8 @@ class LivePanel(QWidget):
         self.target_confidence = 0.0
         self.display_confidence = 0.0
         self.target_state = "SEARCHING"
+        self.live_candidate_mode = "Detected"
+        self.latest_candidate_text = "-"
         self.history_display[:] = np.nan
         self.render_timer.start()
         self.log_message.emit("LIVE iniciado.")
@@ -264,6 +305,7 @@ class LivePanel(QWidget):
         self.bpm_label.setText("0.00")
         self.beat_label.setText("- ms / beat")
         self.conf_card.set_value("0.00")
+        self.live_candidates_card.set_value("-")
         self.history_display[:] = np.nan
         self.history_curve.setData(self.history_x, self.history_display)
         self.log_message.emit("LIVE detenido.")
@@ -312,6 +354,15 @@ class LivePanel(QWidget):
         display_bpm = update.bpm
         display_state = update.state.upper().replace("-", " ")
         normalized_half = False
+        candidate_by_label = {candidate.label: candidate for candidate in update.tempo_candidates}
+        half = candidate_by_label.get("Half-time")
+        detected = candidate_by_label.get("Detected")
+        double = candidate_by_label.get("Double-time")
+        if half and detected and double:
+            self.latest_candidate_text = f"{half.bpm:.0f} / {detected.bpm:.0f} / {double.bpm:.0f}"
+        selected_candidate = candidate_by_label.get(self.live_candidate_mode)
+        if selected_candidate is not None:
+            display_bpm = selected_candidate.bpm
         if self.normalize_half_button.isChecked() and 60.0 <= display_bpm < 120.0 and update.confidence >= 0.55:
             doubled = display_bpm * 2.0
             if doubled <= 240.0:
@@ -353,6 +404,7 @@ class LivePanel(QWidget):
         self.bpm_label.setText(f"{display_bpm:.2f}")
         self.state_badge.set_status(display_state)
         self.conf_card.set_value(f"{self.display_confidence:.2f}")
+        self.live_candidates_card.set_value(self.latest_candidate_text, self.live_candidate_mode)
         beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
         self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
         self.timing_grid.set_beat_ms(beat_ms)
@@ -368,3 +420,17 @@ class LivePanel(QWidget):
         else:
             self.state_badge.set_status("SEARCHING")
             self.log_message.emit("Manual lock desactivado.")
+
+    def _set_live_candidate_mode(self, mode: str) -> None:
+        self.live_candidate_mode = mode
+        self.live_candidates_card.set_value(self.latest_candidate_text, mode)
+        self.log_message.emit(f"Live tempo mode: {mode}.")
+
+    def _live_bpm_range(self) -> tuple[float, float]:
+        ranges = {
+            "Slow 50-90": (50.0, 90.0),
+            "Normal 80-160": (80.0, 160.0),
+            "Fast 140-200": (140.0, 200.0),
+            "Custom 35-240": (35.0, 240.0),
+        }
+        return ranges.get(self.range_combo.currentText(), (35.0, 240.0))

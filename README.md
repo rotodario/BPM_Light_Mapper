@@ -7,11 +7,13 @@ Aplicacion de escritorio en Python para mapear BPM de audio offline y detectar B
 Pensada para preproduccion y operacion de iluminacion:
 
 - BPM global con confianza
+- candidatos half-time / detected / double-time
 - Beat grid visual
 - Zonas con cambios de tempo
 - Correccion manual de segmentos
 - Exportacion a JSON, CSV y TXT
 - Deteccion live con estado `searching`, `unstable`, `locked`
+- `LOCKED` en live prioriza estabilidad operativa para iluminacion; half/double-time se resuelve con candidatos seleccionables
 
 ## Stack
 
@@ -93,6 +95,7 @@ La UI offline esta organizada como panel tecnico:
 - Estado de bloqueo
 - Tap tempo manual
 - Tiempos utiles para iluminacion en BPM x y BPM /
+- seleccion de candidato half-time / detected / double-time para usar el clock mas util en iluminacion
 
 ## Validacion sintetica
 

@@ -7,6 +7,7 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QDoubleSpinBox,
     QFormLayout,
@@ -261,6 +262,11 @@ class MainWindow(QMainWindow):
         self.confidence_card = MetricCard("Confidence", "-", compact=True)
         self.beat_ms_card = MetricCard("Beat ms", "-", compact=True)
         self.candidates_card = MetricCard("Half / Double", "-", compact=True)
+        self.use_half_button = QPushButton("Use half")
+        self.use_detected_button = QPushButton("Use detected")
+        self.use_double_button = QPushButton("Use double")
+        for button in [self.use_half_button, self.use_detected_button, self.use_double_button]:
+            button.setEnabled(False)
         self.zone_count_card = MetricCard("Zonas", "-", compact=True)
         self.duration_card = MetricCard("Duracion", "-", compact=True)
         self.current_zone_card = MetricCard("Zona Actual", "-", compact=True)
@@ -269,9 +275,12 @@ class MainWindow(QMainWindow):
         metrics_grid.addWidget(self.confidence_card, 2, 0)
         metrics_grid.addWidget(self.beat_ms_card, 2, 1)
         metrics_grid.addWidget(self.candidates_card, 3, 0, 1, 2)
-        metrics_grid.addWidget(self.zone_count_card, 4, 0)
-        metrics_grid.addWidget(self.duration_card, 4, 1)
-        metrics_grid.addWidget(self.current_zone_card, 5, 0, 1, 2)
+        metrics_grid.addWidget(self.use_half_button, 4, 0)
+        metrics_grid.addWidget(self.use_detected_button, 4, 1)
+        metrics_grid.addWidget(self.use_double_button, 5, 0, 1, 2)
+        metrics_grid.addWidget(self.zone_count_card, 6, 0)
+        metrics_grid.addWidget(self.duration_card, 6, 1)
+        metrics_grid.addWidget(self.current_zone_card, 7, 0, 1, 2)
         metrics_panel.body.addLayout(metrics_grid)
 
         right = QWidget()
@@ -323,8 +332,12 @@ class MainWindow(QMainWindow):
         self.onset_spin = self._spin(0.3, 3.0, 1.0, 0.1)
         self.bpm_min_spin = self._spin(40.0, 200.0, 60.0, 1.0)
         self.bpm_max_spin = self._spin(60.0, 240.0, 180.0, 1.0)
+        self.preferred_range_combo = QComboBox()
+        self.preferred_range_combo.addItems(["Custom", "Slow 50-90", "Normal 80-160", "Fast 140-200"])
+        self.preferred_range_combo.currentTextChanged.connect(self._apply_preferred_range)
         self.beat_offset_spin = self._spin(-2.0, 2.0, 0.0, 0.01)
         self.beat_offset_button = QPushButton("Aplicar offset")
+        layout.addRow("Preferred range", self.preferred_range_combo)
         layout.addRow("Ventana (s)", self.window_spin)
         layout.addRow("Hop (s)", self.hop_spin)
         layout.addRow("Cambio BPM", self.min_change_spin)
@@ -335,6 +348,18 @@ class MainWindow(QMainWindow):
         layout.addRow("Offset beats", self.beat_offset_spin)
         layout.addRow("", self.beat_offset_button)
         return group
+
+    def _apply_preferred_range(self, label: str) -> None:
+        ranges = {
+            "Slow 50-90": (50.0, 90.0),
+            "Normal 80-160": (80.0, 160.0),
+            "Fast 140-200": (140.0, 200.0),
+        }
+        if label not in ranges:
+            return
+        bpm_min, bpm_max = ranges[label]
+        self.bpm_min_spin.setValue(bpm_min)
+        self.bpm_max_spin.setValue(bpm_max)
 
     def _connect_actions(self) -> None:
         self.load_button.clicked.connect(self.load_file)
@@ -353,6 +378,9 @@ class MainWindow(QMainWindow):
         self.delete_segment_button.clicked.connect(self.delete_segment)
         self.split_segment_button.clicked.connect(self.split_segment)
         self.merge_segment_button.clicked.connect(self.merge_segment)
+        self.use_half_button.clicked.connect(lambda: self.apply_tempo_candidate("Half-time"))
+        self.use_detected_button.clicked.connect(lambda: self.apply_tempo_candidate("Detected"))
+        self.use_double_button.clicked.connect(lambda: self.apply_tempo_candidate("Double-time"))
 
     def _refresh_test_audio_menu(self) -> None:
         self.test_audio_menu.clear()
@@ -437,6 +465,9 @@ class MainWindow(QMainWindow):
             self.delete_segment_button,
             self.split_segment_button,
             self.merge_segment_button,
+            self.use_half_button,
+            self.use_detected_button,
+            self.use_double_button,
         ]:
             button.setEnabled(enabled)
 
@@ -512,6 +543,8 @@ class MainWindow(QMainWindow):
         self.position_label.setText("00:00.000")
         self.file_info.setText(f"Archivo: {Path(file_path).name}")
         self._update_empty_metrics()
+        for button in [self.use_half_button, self.use_detected_button, self.use_double_button]:
+            button.setEnabled(False)
         self.waveform_widget.set_waveform([], 0.0)
         self.segment_table.load_segments([])
         self.log(f"Archivo cargado: {file_path}")
@@ -590,6 +623,17 @@ class MainWindow(QMainWindow):
         )
         beat_ms = 60000.0 / result.bpm_global if result.bpm_global > 0 else 0.0
         candidates = " / ".join(f"{value:.2f}" for value in result.bpm_candidates)
+        tempo_candidates = {candidate.label: candidate for candidate in result.tempo_candidates}
+        half = tempo_candidates.get("Half-time")
+        detected = tempo_candidates.get("Detected")
+        double = tempo_candidates.get("Double-time")
+        if half and detected and double:
+            candidates = f"Half-time: {half.bpm:.2f} / Detected: {detected.bpm:.2f} / Double-time: {double.bpm:.2f}"
+            self.use_half_button.setText(f"Use {half.bpm:.0f}")
+            self.use_detected_button.setText(f"Use {detected.bpm:.0f}")
+            self.use_double_button.setText(f"Use {double.bpm:.0f}")
+            for button in [self.use_half_button, self.use_detected_button, self.use_double_button]:
+                button.setEnabled(True)
         self.global_bpm_card.set_value(f"{result.bpm_global:.2f}", "BPM estimado")
         self.global_bpm_card.set_accent(COLORS["green"] if result.confidence_global >= 0.7 else COLORS["cyan"])
         self.confidence_card.set_value(f"{result.confidence_global:.2f}")
@@ -622,6 +666,22 @@ class MainWindow(QMainWindow):
             self.log(f"Aviso: {warning}")
         self.log(f"Analisis completado. Segmentos detectados: {len(result.segments)}.")
         self._set_busy(False, "IDLE", "listo")
+
+    def apply_tempo_candidate(self, label: str) -> None:
+        if self.analysis_result is None:
+            return
+        candidate = next((item for item in self.analysis_result.tempo_candidates if item.label == label), None)
+        if candidate is None:
+            return
+        old_bpm = self.analysis_result.bpm_global
+        self.analysis_result.bpm_global = candidate.bpm
+        self.analysis_result.confidence_global = candidate.confidence
+        beat_ms = candidate.beat_interval_ms
+        self.global_bpm_card.set_value(f"{candidate.bpm:.2f}", f"{label} seleccionado")
+        self.confidence_card.set_value(f"{candidate.confidence:.2f}")
+        self.beat_ms_card.set_value(f"{beat_ms:.2f}", "ms por negra")
+        self.offline_timing_grid.set_beat_ms(beat_ms)
+        self.log(f"Tempo candidate aplicado: {old_bpm:.2f} -> {candidate.bpm:.2f} BPM ({label}).")
 
     def apply_beat_offset(self) -> None:
         if self.analysis_result is None:

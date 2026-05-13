@@ -82,6 +82,26 @@ The global BPM is derived from the onset representation and summarized as:
 
 This is intentionally not treated as the whole truth for the song.
 
+## 4.1 Tempo Candidate Resolver
+
+After a primary BPM is detected, the app evaluates related tempo candidates:
+
+- half-time: `bpm / 2`
+- detected: `bpm`
+- double-time: `bpm * 2`
+
+Each candidate stores:
+
+- beat interval in milliseconds
+- grid alignment score
+- onset alignment score
+- accent score
+- confidence
+- whether it is inside the configured BPM range
+
+If multiple candidates score well, the analysis warns about possible half-time/double-time ambiguity.
+This is important for material where a musical 60 BPM groove contains hats or other intermediate transients that make 120 BPM look technically plausible.
+
 ## 5. Local BPM Windows
 
 Handled by:

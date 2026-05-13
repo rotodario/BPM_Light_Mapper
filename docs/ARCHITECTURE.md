@@ -59,6 +59,11 @@ bpm_light_mapper/
   - applies smoothing and minimum segment duration heuristics
   - converts overlapping analysis windows into non-overlapping displayed/exported segment boundaries
 
+- `tempo_candidate_resolver.py`
+  - scores half-time, detected and double-time candidates
+  - calculates grid, onset and accent alignment metrics
+  - reports half-time/double-time ambiguity without hiding alternatives
+
 - `live_analyzer.py`
   - opens selected input device
   - writes incoming audio into a bounded ring buffer
@@ -66,6 +71,7 @@ bpm_light_mapper/
   - prepares reduced min/max waveform data for live rendering
   - smooths BPM history
   - emits `searching`, `unstable`, `locked`
+  - treats `locked` as operational BPM stability for lighting, while half/double-time certainty is exposed through candidates
 
 - `synthetic_tests.py`
   - generates synthetic validation material
@@ -79,6 +85,9 @@ bpm_light_mapper/
 
 - `analysis_result.py`
   - aggregate analysis result for export and UI binding
+
+- `tempo_candidate.py`
+  - structured score model for related tempo candidates
 
 ### `app/ui`
 

@@ -26,6 +26,8 @@ It should help an operator answer:
 - BPM x and BPM / timing grid for lighting divisions
 - dark HUD panel optimized for visibility from a control position
 - non-blocking live startup so device errors should return to the UI instead of freezing it
+- half-time / detected / double-time candidate display and selection
+- preferred BPM range presets for slow, normal and fast material
 
 ## Runtime Architecture
 
@@ -46,6 +48,17 @@ Key rules:
 
 This means the UI should remain responsive even if BPM analysis is temporarily expensive.
 
+## Half-Time / Double-Time
+
+Live mode evaluates candidate tempos around the detected value:
+
+- half-time
+- detected
+- double-time
+
+Use the candidate buttons when the useful lighting clock differs from the detected rhythmic subdivision.
+For example, a 60 BPM groove with hats can produce a strong 120 BPM detection; selecting half-time keeps the display and timing grid aligned to 60 BPM.
+
 ## Detection States
 
 ### `searching`
@@ -65,8 +78,7 @@ Operational advice:
 Meaning:
 
 - a BPM estimate exists
-- confidence is moderate
-- short-term variation is still noticeable
+- confidence is low/moderate or short-term variation is still noticeable
 
 Operational advice:
 
@@ -77,13 +89,20 @@ Operational advice:
 
 Meaning:
 
-- confidence is high enough
+- input level is present
 - recent BPM estimates are consistent
+- confidence is high enough to trust the clock operationally
 
 Operational advice:
 
 - suitable for practical timing reference
 - still monitor for real tempo changes
+
+Important:
+
+- `locked` does not mean the app has solved the musical half-time/double-time question with absolute certainty
+- a drum groove can be locked while still showing valid half/detected/double candidates
+- use the candidate buttons when the lighting clock should follow a different subdivision
 
 ### `manual-lock`
 
@@ -170,7 +189,7 @@ Avoid if possible:
 ## Planned Improvements
 
 - stronger change markers
-- better lock retention logic
+- expose raw BPM / locked BPM / confidence diagnostics in the UI
 - more explicit live ambiguity warnings
 - optional export or network hooks for external lighting tools
 - lower-level backend diagnostics per audio device

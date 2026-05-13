@@ -10,6 +10,7 @@ from bpm_light_mapper.app.audio.beat_tracker import (
     detect_beats,
 )
 from bpm_light_mapper.app.audio.loader import load_audio
+from bpm_light_mapper.app.audio.tempo_candidate_resolver import resolve_tempo_candidates
 from bpm_light_mapper.app.audio.tempo_map import TempoMapParameters, generate_tempo_map
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.utils.logging_utils import get_logger, log_timing
@@ -127,6 +128,15 @@ def analyze_file(
     confidence_global = beat_consistency_confidence(beat_times, bpm_global)
     warnings: list[str] = []
     candidates = _bpm_candidates(bpm_global, params.bpm_min, params.bpm_max)
+    tempo_candidates, candidate_warnings = resolve_tempo_candidates(
+        bpm_global,
+        beat_times,
+        onset_envelope,
+        onset_times,
+        params.bpm_min,
+        params.bpm_max,
+    )
+    warnings.extend(candidate_warnings)
     if any(abs(candidate - bpm_global) > 15 for candidate in candidates if candidate != bpm_global):
         warnings.append("Posible ambiguedad half-time/double-time. Revisa candidatos alternativos.")
 
@@ -170,6 +180,7 @@ def analyze_file(
         bpm_global=bpm_global,
         bpm_candidates=candidates,
         confidence_global=confidence_global,
+        tempo_candidates=tempo_candidates,
         beat_times=[float(x) for x in beat_times.tolist()],
         onset_envelope=[float(x) for x in onset_envelope.tolist()],
         onset_times=[float(x) for x in onset_times.tolist()],

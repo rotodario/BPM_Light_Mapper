@@ -40,6 +40,7 @@ class TestOutcome:
     detected_bpm: float
     abs_error: float | None
     confidence: float
+    candidate_bpms: list[float]
     expected_segments: list[SegmentSummary]
     detected_segments: list[SegmentSummary]
     passed: bool
@@ -162,6 +163,13 @@ def _detect_segment_overlaps(detected: list[SegmentSummary]) -> list[tuple[Segme
     return overlaps
 
 
+def _candidate_bpms(result) -> list[float]:
+    candidates = [float(value) for value in getattr(result, "bpm_candidates", [])]
+    for candidate in getattr(result, "tempo_candidates", []):
+        candidates.append(float(candidate.bpm))
+    return candidates
+
+
 def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
     expected_bpm = test.get("global_bpm")
     if expected_bpm is None and "alternate_bpm" in test and test.get("alternate_bpm") is not None:
@@ -183,8 +191,25 @@ def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
     file_name = test["file"]
     description = test.get("description", file_name)
     file_lower = file_name.lower()
+    required_candidate = test.get("requires_candidate_bpm")
+    if required_candidate is not None:
+        required_candidate = float(required_candidate)
+        if any(abs(candidate - required_candidate) <= 1.0 for candidate in _candidate_bpms(result)):
+            notes.append(f"required BPM {required_candidate:.2f} present in tempo candidates")
+        else:
+            passed = False
+            notes.append(f"required BPM {required_candidate:.2f} missing from tempo candidates")
 
-    if "constant_click_120" in file_lower or "constant_click_128" in file_lower:
+    if "constant_click_60" in file_lower:
+        threshold = 0.2
+        if abs_error is None or abs_error > threshold:
+            passed = False
+            notes.append(f"global bpm error above {threshold:.1f} BPM")
+    elif "musical_pattern_60bpm_hats" in file_lower:
+        if required_candidate is None:
+            passed = False
+            notes.append("missing requires_candidate_bpm ground truth")
+    elif "constant_click_120" in file_lower or "constant_click_128" in file_lower:
         threshold = 0.2
         if abs_error is None or abs_error > threshold:
             passed = False
@@ -242,6 +267,7 @@ def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
             abs_error > 1.0
             and "low_onset_pad" not in file_lower
             and "half_time_70_double_140" not in file_lower
+            and "musical_pattern_60bpm_hats" not in file_lower
             and "silence_breaks" not in file_lower
             and "tempo_map" not in file_lower
             and "gradual_ramp" not in file_lower
@@ -259,6 +285,7 @@ def _evaluate_test(test: dict[str, Any], result) -> TestOutcome:
         detected_bpm=detected_bpm,
         abs_error=abs_error,
         confidence=confidence,
+        candidate_bpms=sorted(set(round(value, 2) for value in _candidate_bpms(result))),
         expected_segments=expected_segments,
         detected_segments=detected_segments,
         passed=passed,
@@ -307,6 +334,7 @@ def _render_markdown(outcomes: list[TestOutcome], output_path: Path) -> None:
         lines.append(f"- Detected BPM: {outcome.detected_bpm:.2f}")
         lines.append(f"- Absolute error: {_format_bpm(outcome.abs_error)}")
         lines.append(f"- Confidence: {outcome.confidence:.2f}")
+        lines.append(f"- Candidates: {', '.join(f'{value:.2f}' for value in outcome.candidate_bpms) or '-'}")
         lines.append(f"- Result: {'PASS' if outcome.passed else 'FAIL'}")
         if outcome.notes:
             lines.append(f"- Notes: {'; '.join(outcome.notes)}")
@@ -328,7 +356,8 @@ def _print_console_report(outcomes: list[TestOutcome]) -> None:
         error = "-" if outcome.abs_error is None else f"{outcome.abs_error:.2f}"
         print(
             f"[{status}] {outcome.file_name} | expected={_format_bpm(outcome.expected_bpm)} "
-            f"detected={outcome.detected_bpm:.2f} error={error} conf={outcome.confidence:.2f}"
+            f"detected={outcome.detected_bpm:.2f} error={error} conf={outcome.confidence:.2f} "
+            f"candidates={','.join(f'{value:.0f}' for value in outcome.candidate_bpms)}"
         )
         if outcome.notes:
             print(f"  notes: {'; '.join(outcome.notes)}")
@@ -361,6 +390,7 @@ def main() -> int:
                     detected_bpm=0.0,
                     abs_error=None,
                     confidence=0.0,
+                    candidate_bpms=[],
                     expected_segments=_segment_summaries_from_expected(test),
                     detected_segments=[],
                     passed=False,

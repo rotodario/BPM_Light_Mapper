@@ -10,6 +10,8 @@ import sounddevice as sd
 from scipy.signal import find_peaks
 
 from bpm_light_mapper.app.audio.beat_tracker import compute_onset_envelope
+from bpm_light_mapper.app.audio.tempo_candidate_resolver import resolve_tempo_candidates
+from bpm_light_mapper.app.models.tempo_candidate import TempoCandidate
 from bpm_light_mapper.app.utils.logging_utils import get_logger
 
 
@@ -21,6 +23,7 @@ class LiveUpdate:
     level: float
     beat_ms: float
     history: list[float]
+    tempo_candidates: list[TempoCandidate]
     change_detected: bool
     timestamp: float
 
@@ -87,6 +90,9 @@ class LiveBpmAnalyzer:
         self.locked_bpm = 0.0
         self.pending_bpm = 0.0
         self.pending_count = 0
+        self.low_level_count = 0
+        self.latest_tempo_candidates: list[TempoCandidate] = []
+        self.last_candidate_update = 0.0
         self.last_state = "searching"
         self.buffer_lock = threading.Lock()
         self.stop_event = threading.Event()
@@ -264,6 +270,12 @@ class LiveBpmAnalyzer:
     def _process_window(self, window: np.ndarray, level: float, now: float) -> None:
         try:
             bpm, confidence = self._estimate_bpm(window)
+            if level < 0.003:
+                self.low_level_count += 1
+                if self.low_level_count >= 8:
+                    self._reset_tempo_lock()
+            else:
+                self.low_level_count = 0
             bpm = self._apply_hysteresis(bpm, confidence)
             if bpm <= 0.0:
                 smoothed = self.smoothed_bpm
@@ -283,10 +295,12 @@ class LiveBpmAnalyzer:
                 self.history.append(smoothed)
                 self.history = self.history[-240:]
 
-            variance = float(np.std(self.last_bpms)) if len(self.last_bpms) > 3 else 999.0
-            if confidence > 0.68 and variance < 1.2:
+            variance = float(np.std(self.last_bpms)) if len(self.last_bpms) >= 6 else 999.0
+            signal_present = level >= 0.003
+            bpm_stable = len(self.last_bpms) >= 6 and variance < 1.5
+            if signal_present and smoothed > 0.0 and bpm_stable and confidence >= 0.40:
                 state = "locked"
-            elif confidence > 0.38 and smoothed > 0.0:
+            elif signal_present and smoothed > 0.0 and confidence >= 0.25:
                 state = "unstable"
             else:
                 state = "searching"
@@ -297,6 +311,22 @@ class LiveBpmAnalyzer:
                 if abs(smoothed - prev) >= 3.0 and state != "searching":
                     change_detected = True
 
+            if smoothed > 0.0 and (now - self.last_candidate_update >= 1.0 or not self.latest_tempo_candidates):
+                candidate_onsets, candidate_times = compute_onset_envelope(
+                    window,
+                    self.sample_rate,
+                    hop_length=self.hop_length,
+                )
+                candidate_beats = self._onset_peak_times(candidate_onsets, candidate_times)
+                self.latest_tempo_candidates, _ = resolve_tempo_candidates(
+                    smoothed,
+                    candidate_beats,
+                    candidate_onsets,
+                    candidate_times,
+                    self.bpm_min,
+                    self.bpm_max,
+                )
+                self.last_candidate_update = now
             update = LiveUpdate(
                 bpm=smoothed,
                 confidence=confidence,
@@ -304,6 +334,7 @@ class LiveBpmAnalyzer:
                 level=level,
                 beat_ms=(60000.0 / smoothed) if smoothed > 0 else 0.0,
                 history=list(self.history),
+                tempo_candidates=list(self.latest_tempo_candidates),
                 change_detected=change_detected,
                 timestamp=now,
             )
@@ -319,10 +350,15 @@ class LiveBpmAnalyzer:
         if bpm <= 0.0:
             return self.locked_bpm if self.locked_bpm > 0.0 else 0.0
         if self.locked_bpm <= 0.0:
+            if confidence < 0.25:
+                return 0.0
             self.locked_bpm = bpm
             self.pending_bpm = 0.0
             self.pending_count = 0
             return bpm
+
+        if confidence < 0.25:
+            return self.locked_bpm
 
         ratio = bpm / self.locked_bpm
         same_tempo = 0.85 <= ratio <= 1.15
@@ -335,27 +371,34 @@ class LiveBpmAnalyzer:
             self.pending_count = 0
             return self.locked_bpm
 
-        if octave_change or large_change:
-            if self.pending_bpm > 0.0 and abs(self.pending_bpm - bpm) <= max(1.0, self.pending_bpm * 0.08):
-                self.pending_count += 1
-            else:
-                self.pending_bpm = bpm
-                self.pending_count = 1
+        if self.pending_bpm > 0.0 and abs(self.pending_bpm - bpm) <= max(1.0, self.pending_bpm * 0.08):
+            self.pending_count += 1
+        else:
+            self.pending_bpm = bpm
+            self.pending_count = 1
 
-            required_hits = 8 if octave_change else 4
-            confidence_gate = 0.55 if octave_change else 0.60
-            if self.pending_count >= required_hits and confidence >= confidence_gate:
-                self.locked_bpm = bpm
-                self.pending_bpm = 0.0
-                self.pending_count = 0
-                self.logger.info("LIVE BPM locked to %.2f after hysteresis", bpm)
-                return bpm
+        required_hits = 5 if octave_change else 3
+        if not octave_change and not large_change:
+            required_hits = 3
+        confidence_gate = 0.45 if octave_change else 0.40
+        if self.pending_count >= required_hits and confidence >= confidence_gate:
+            self.locked_bpm = bpm
+            self.pending_bpm = 0.0
+            self.pending_count = 0
+            self.last_bpms.clear()
+            self.logger.info("LIVE BPM relocked to %.2f after source/tempo change", bpm)
+            return bpm
 
-            return self.locked_bpm
+        return self.locked_bpm
 
+    def _reset_tempo_lock(self) -> None:
+        if self.locked_bpm <= 0.0 and self.pending_bpm <= 0.0:
+            return
+        self.logger.info("Resetting LIVE tempo lock after low-level audio")
+        self.locked_bpm = 0.0
         self.pending_bpm = 0.0
         self.pending_count = 0
-        return bpm
+        self.last_bpms.clear()
 
     def _estimate_bpm(self, samples: np.ndarray) -> tuple[float, float]:
         full_bpm, full_confidence = self._estimate_bpm_from_samples(samples)
@@ -463,6 +506,14 @@ class LiveBpmAnalyzer:
         grid_score = aligned / len(peaks)
         peak_energy = float(np.mean(env[peaks]) / env_max) if len(peaks) else 0.0
         return (interval_score * 0.60) + (grid_score * 0.25) + (peak_energy * 0.15)
+
+    @staticmethod
+    def _onset_peak_times(onset_env: np.ndarray, onset_times: np.ndarray) -> np.ndarray:
+        if len(onset_env) < 4 or len(onset_times) != len(onset_env):
+            return np.zeros(0, dtype=float)
+        env_max = max(float(np.max(onset_env)), 1e-9)
+        peaks, _ = find_peaks(onset_env, distance=2, prominence=max(0.03, env_max * 0.08))
+        return onset_times[peaks].astype(float)
 
     def _report_error(self, message: str) -> None:
         if message == self.last_error:

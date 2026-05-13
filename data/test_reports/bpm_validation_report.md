@@ -1,7 +1,7 @@
 # BPM Validation Report
 
-- Total tests: 9
-- Passed: 9
+- Total tests: 11
+- Passed: 11
 - Failed: 0
 
 | File | Expected BPM | Detected BPM | Abs Error | Confidence | Pass |
@@ -15,6 +15,8 @@
 | 07_gradual_ramp_120_to_128bpm_60s.wav | - | 124.04 | - | 0.50 | PASS |
 | 08_waltz_3_4_90bpm_60s.wav | 90.00 | 90.00 | 0.00 | 1.00 | PASS |
 | 09_low_onset_pad_100bpm_60s.wav | 100.00 | 114.49 | 14.49 | 0.24 | PASS |
+| 10_constant_click_60bpm_60s.wav | 60.00 | 60.00 | 0.00 | 1.00 | PASS |
+| 11_musical_pattern_60bpm_hats_60s.wav | 60.00 | 120.00 | 60.00 | 1.00 | PASS |
 
 ## 01_constant_click_120bpm_60s.wav
 
@@ -23,6 +25,7 @@
 - Detected BPM: 120.00
 - Absolute error: 0.00
 - Confidence: 1.00
+- Candidates: 60.00, 120.00, 240.00
 - Result: PASS
 
 ### Segments
@@ -37,6 +40,7 @@
 - Detected BPM: 128.00
 - Absolute error: 0.00
 - Confidence: 1.00
+- Candidates: 64.00, 128.00, 256.00
 - Result: PASS
 
 ### Segments
@@ -51,6 +55,7 @@
 - Detected BPM: 128.00
 - Absolute error: 0.00
 - Confidence: 0.50
+- Candidates: 64.00, 128.00, 256.00
 - Result: PASS
 
 ### Segments
@@ -65,6 +70,7 @@
 - Detected BPM: 123.99
 - Absolute error: -
 - Confidence: 0.50
+- Candidates: 62.00, 123.99, 247.99
 - Result: PASS
 
 ### Segments
@@ -79,6 +85,7 @@
 - Detected BPM: 128.00
 - Absolute error: 0.00
 - Confidence: 0.25
+- Candidates: 64.00, 128.00, 256.00
 - Result: PASS
 - Notes: no false segments detected during silence
 
@@ -94,6 +101,7 @@
 - Detected BPM: 140.00
 - Absolute error: 70.00
 - Confidence: 1.00
+- Candidates: 70.00, 140.00, 280.00
 - Result: PASS
 - Notes: global BPM is ambiguous by design
 
@@ -109,6 +117,7 @@
 - Detected BPM: 124.04
 - Absolute error: -
 - Confidence: 0.50
+- Candidates: 62.02, 124.04, 248.08
 - Result: PASS
 
 ### Segments
@@ -123,6 +132,7 @@
 - Detected BPM: 90.00
 - Absolute error: 0.00
 - Confidence: 1.00
+- Candidates: 45.00, 90.00, 180.00
 - Result: PASS
 
 ### Segments
@@ -137,6 +147,7 @@
 - Detected BPM: 114.49
 - Absolute error: 14.49
 - Confidence: 0.24
+- Candidates: 57.24, 114.49, 228.97
 - Result: PASS
 - Notes: low confidence as expected
 
@@ -144,3 +155,34 @@
 
 - Expected: 0.0-60.0s | 100.00 BPM | low onset confidence test
 - Detected: 0.0-60.0s | 114.49 BPM | conf 0.66
+
+## 10_constant_click_60bpm_60s.wav
+
+- Description: Click track constante a 60 BPM
+- Expected BPM: 60.00
+- Detected BPM: 60.00
+- Absolute error: 0.00
+- Confidence: 1.00
+- Candidates: 30.00, 60.00, 120.00
+- Result: PASS
+
+### Segments
+
+- Expected: 0.0-60.0s | 60.00 BPM | constant slow click
+- Detected: 0.0-60.0s | 60.00 BPM | conf 0.60
+
+## 11_musical_pattern_60bpm_hats_60s.wav
+
+- Description: Patron musical a 60 BPM con transitorios intermedios que pueden sugerir 120 BPM
+- Expected BPM: 60.00
+- Detected BPM: 120.00
+- Absolute error: 60.00
+- Confidence: 1.00
+- Candidates: 60.00, 120.00, 240.00
+- Result: PASS
+- Notes: required BPM 60.00 present in tempo candidates
+
+### Segments
+
+- Expected: 0.0-60.0s | 60.00 BPM | 60 BPM with half-beat hats
+- Detected: 0.0-60.0s | 120.00 BPM | conf 0.61

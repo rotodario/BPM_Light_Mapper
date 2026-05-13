@@ -31,7 +31,7 @@
     },
     {
       "file": "03_kick_hat_128bpm_60s.wav",
-      "description": "Patrón kick/hat constante a 128 BPM, más parecido a música electrónica simple",
+      "description": "Patr\u00f3n kick/hat constante a 128 BPM, m\u00e1s parecido a m\u00fasica electr\u00f3nica simple",
       "duration": 60,
       "global_bpm": 128,
       "segments": [
@@ -45,7 +45,7 @@
     },
     {
       "file": "04_tempo_map_120_128_124bpm_90s.wav",
-      "description": "Tema sintético con cambios de BPM por zonas",
+      "description": "Tema sint\u00e9tico con cambios de BPM por zonas",
       "duration": 90.0,
       "global_bpm": null,
       "segments": [
@@ -71,7 +71,7 @@
     },
     {
       "file": "05_128bpm_with_silence_breaks_75s.wav",
-      "description": "128 BPM con silencios/breaks para probar estabilidad y recuperación",
+      "description": "128 BPM con silencios/breaks para probar estabilidad y recuperaci\u00f3n",
       "duration": 75,
       "global_bpm": 128,
       "segments": [
@@ -97,7 +97,7 @@
     },
     {
       "file": "06_half_time_70_double_140_60s.wav",
-      "description": "Caso ambiguo: pulso fuerte a 70 BPM pero subdivisión marcada a 140 BPM",
+      "description": "Caso ambiguo: pulso fuerte a 70 BPM pero subdivisi\u00f3n marcada a 140 BPM",
       "duration": 60,
       "global_bpm": 70,
       "alternate_bpm": 140,
@@ -128,7 +128,7 @@
     },
     {
       "file": "08_waltz_3_4_90bpm_60s.wav",
-      "description": "Compás 3/4 a 90 BPM, para comprobar que no se confunde con acento de compás",
+      "description": "Comp\u00e1s 3/4 a 90 BPM, para comprobar que no se confunde con acento de comp\u00e1s",
       "duration": 60,
       "global_bpm": 90,
       "meter": "3/4",
@@ -144,7 +144,7 @@
     },
     {
       "file": "09_low_onset_pad_100bpm_60s.wav",
-      "description": "Pad con transitorios débiles a 100 BPM. Caso difícil: debería dar baja confianza.",
+      "description": "Pad con transitorios d\u00e9biles a 100 BPM. Caso dif\u00edcil: deber\u00eda dar baja confianza.",
       "duration": 60,
       "global_bpm": 100,
       "segments": [
@@ -153,6 +153,37 @@
           "end": 60,
           "bpm": 100,
           "notes": "low onset confidence test"
+        }
+      ]
+    },
+    {
+      "file": "10_constant_click_60bpm_60s.wav",
+      "description": "Click track constante a 60 BPM",
+      "duration": 60,
+      "global_bpm": 60,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 60,
+          "notes": "constant slow click"
+        }
+      ]
+    },
+    {
+      "file": "11_musical_pattern_60bpm_hats_60s.wav",
+      "description": "Patron musical a 60 BPM con transitorios intermedios que pueden sugerir 120 BPM",
+      "duration": 60,
+      "global_bpm": 60,
+      "alternate_bpm": 120,
+      "requires_candidate_bpm": 60,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 60,
+          "bpm": 60,
+          "alternate_bpm": 120,
+          "notes": "60 BPM with half-beat hats"
         }
       ]
     }
