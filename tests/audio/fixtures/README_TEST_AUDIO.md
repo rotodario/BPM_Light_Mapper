@@ -1,4 +1,4 @@
-# BPM Light Mapper - Test Audio Pack
+# BeatScope - Test Audio Pack
 
 Audios sintéticos para probar detección de BPM, beat grid, segmentación por zonas y casos difíciles.
 

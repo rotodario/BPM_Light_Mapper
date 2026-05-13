@@ -339,18 +339,20 @@ def _tempo_candidate_models(
     ]
     result: list[TempoCandidate] = []
     for label, raw_bpm in labels:
-        normalized = _normalize_bpm(raw_bpm, bpm_min, bpm_max)
-        score = by_bpm.get(round(normalized, 1)) or _nearest_score(normalized, scores) or chosen
+        candidate_bpm = float(raw_bpm)
+        comparable_bpm = _normalize_bpm(candidate_bpm, bpm_min, bpm_max)
+        score = by_bpm.get(round(comparable_bpm, 1)) or _nearest_score(comparable_bpm, scores) or chosen
         in_range = bpm_min <= raw_bpm <= bpm_max
+        confidence = score.confidence if in_range else score.confidence * 0.92
         result.append(
             TempoCandidate(
                 label=label,
-                bpm=float(normalized),
-                beat_interval_ms=float(60000.0 / normalized) if normalized > 0 else 0.0,
+                bpm=candidate_bpm,
+                beat_interval_ms=float(60000.0 / candidate_bpm) if candidate_bpm > 0 else 0.0,
                 grid_alignment_score=score.alignment,
                 onset_alignment_score=score.onset_alignment,
                 accent_score=score.accent,
-                confidence=score.confidence,
+                confidence=float(np.clip(confidence, 0.0, 1.0)),
                 in_configured_range=in_range,
             )
         )

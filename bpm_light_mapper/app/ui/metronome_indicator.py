@@ -139,7 +139,7 @@ class MetronomeIndicator(QFrame):
     sound-device complexity.
     """
 
-    def __init__(self, title: str = "METRONOMO", led_config: Optional[LedBallistics] = None) -> None:
+    def __init__(self, title: str = "METRONOME", led_config: Optional[LedBallistics] = None) -> None:
         super().__init__()
         self.setObjectName("MetricCard")
         self._last_active = False

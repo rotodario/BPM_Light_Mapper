@@ -132,7 +132,7 @@
 - Detected BPM: 89.97
 - Absolute error: 0.03
 - Confidence: 0.95
-- Candidates: 89.97, 179.95
+- Candidates: 44.99, 89.97, 179.95
 - Result: PASS
 
 ### Segments
@@ -147,7 +147,7 @@
 - Detected BPM: 99.85
 - Absolute error: 0.15
 - Confidence: 0.73
-- Candidates: 99.85, 199.70
+- Candidates: 49.93, 99.85, 199.70
 - Result: PASS
 - Notes: moderate confidence on a difficult pad fixture
 
@@ -163,7 +163,7 @@
 - Detected BPM: 60.02
 - Absolute error: 0.02
 - Confidence: 0.98
-- Candidates: 60.02, 120.04
+- Candidates: 30.01, 60.02, 120.04
 - Result: PASS
 
 ### Segments

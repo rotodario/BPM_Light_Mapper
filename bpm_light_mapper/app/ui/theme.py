@@ -4,20 +4,21 @@ from PySide6.QtWidgets import QApplication
 
 
 COLORS = {
-    "bg": "#070b10",
-    "panel": "#0d141c",
-    "panel_alt": "#111b25",
-    "panel_edge": "#223243",
-    "text": "#e8f0f6",
-    "muted": "#8fa0af",
-    "cyan": "#28d7ff",
-    "cyan_dim": "#1595b5",
-    "green": "#39ff88",
-    "yellow": "#f7c948",
-    "orange": "#ff9f43",
-    "red": "#ff4d6d",
-    "blue": "#4da3ff",
-    "purple": "#b18cff",
+    "bg": "#070D13",
+    "panel": "#0B121A",
+    "panel_alt": "#101A24",
+    "panel_edge": "#1E3447",
+    "text": "#EAF4FF",
+    "muted": "#8EA6BA",
+    "cyan": "#25D9FF",
+    "cyan_dim": "#00D9FF",
+    "green": "#41F078",
+    "yellow": "#FFD447",
+    "orange": "#FF9F43",
+    "red": "#FF4D6D",
+    "blue": "#4DA3FF",
+    "purple": "#B18CFF",
+    "lime": "#A2FF36",
 }
 
 
@@ -44,10 +45,21 @@ QFrame#SectionPanel, QFrame#MetricCard, QFrame#TimingGrid {{
     border-radius: 8px;
 }}
 
+QFrame#SectionPanel:hover, QFrame#MetricCard:hover {{
+    border-color: #2b4c66;
+}}
+
 QLabel#AppTitle {{
     color: {COLORS["text"]};
     font-size: 24px;
     font-weight: 800;
+}}
+
+QLabel#AppSubtitle {{
+    color: {COLORS["cyan"]};
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0px;
 }}
 
 QLabel#HeaderMeta, QLabel#PanelTitle, QLabel#MetricTitle, QLabel#MetricSubtitle {{
@@ -83,30 +95,30 @@ QLabel#StatusBadge {{
 }}
 
 QPushButton {{
-    background: #172231;
-    border: 1px solid #2b4055;
+    background: #111C27;
+    border: 1px solid #284257;
     border-radius: 6px;
     padding: 8px 12px;
     font-weight: 700;
 }}
 
 QPushButton:hover {{
-    background: #1e2d3d;
+    background: #172A39;
     border-color: {COLORS["cyan_dim"]};
 }}
 
 QPushButton:pressed {{
-    background: #0f1a25;
+    background: #0A151E;
 }}
 
 QPushButton:disabled {{
     color: #5a6875;
-    background: #0c1218;
-    border-color: #17212b;
+    background: #0A1118;
+    border-color: #162736;
 }}
 
 QPushButton[role="primary"] {{
-    background: #0f3a45;
+    background: #0D3A46;
     border-color: {COLORS["cyan_dim"]};
     color: {COLORS["text"]};
 }}
@@ -137,7 +149,7 @@ QMenu::item {{
 }}
 
 QMenu::item:selected {{
-    background: #123647;
+    background: #103B4A;
     color: {COLORS["cyan"]};
 }}
 
@@ -185,13 +197,13 @@ QTabBar::tab:selected {{
 }}
 
 QTableWidget {{
-    background: #091018;
-    viewport-background-color: #091018;
-    alternate-background-color: #0d1721;
-    gridline-color: #1c2b3a;
+    background: #071018;
+    viewport-background-color: #071018;
+    alternate-background-color: #0C1620;
+    gridline-color: #1C3041;
     border: 1px solid {COLORS["panel_edge"]};
     border-radius: 8px;
-    selection-background-color: #123647;
+    selection-background-color: #103B4A;
     selection-color: {COLORS["text"]};
 }}
 

@@ -14,8 +14,8 @@ GROUND_TRUTH_PATH = FIXTURES_DIR / "ground_truth.json"
 REPORT_DIR = REPO_ROOT / "data" / "test_reports"
 REPORT_PATH = REPORT_DIR / "bpm_validation_report.md"
 
-os.environ.setdefault("BPM_LIGHT_MAPPER_LOG_LEVEL", "WARNING")
-os.environ.setdefault("BPM_LIGHT_MAPPER_CONSOLE_LOG", "0")
+os.environ.setdefault("BEATSCOPE_LOG_LEVEL", "WARNING")
+os.environ.setdefault("BEATSCOPE_CONSOLE_LOG", "0")
 
 
 def _ensure_repo_on_path() -> None:

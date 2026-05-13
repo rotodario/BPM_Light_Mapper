@@ -1,4 +1,4 @@
-# BPM Light Mapper Roadmap
+# BeatScope Roadmap
 
 ## Phase 1: Foundation
 

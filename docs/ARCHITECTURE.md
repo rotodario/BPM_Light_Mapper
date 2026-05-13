@@ -1,8 +1,8 @@
-# BPM Light Mapper Architecture
+# BeatScope Architecture
 
 ## Goal
 
-`BPM Light Mapper` is a desktop tool for lighting preproduction and live operation. It focuses on:
+`BeatScope` is a desktop tool for lighting preproduction and live tempo analysis. It focuses on:
 
 - offline BPM mapping over time
 - beat grid inspection
@@ -157,7 +157,7 @@ bpm_light_mapper/
 
 ### Packaging
 
-- `BPM_Light_Mapper.spec`
+- `BeatScope.spec`
   - PyInstaller `onedir` configuration for Windows distribution
   - collects Qt/audio/scientific Python dependencies and test fixtures
 

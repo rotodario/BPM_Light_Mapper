@@ -5,7 +5,7 @@
 The recommended Windows delivery format is a PyInstaller `onedir` build:
 
 ```text
-dist/BPM Light Mapper/BPM Light Mapper.exe
+dist/BeatScope/BeatScope.exe
 ```
 
 This is more reliable than a single-file executable for this app because it depends on:
@@ -45,8 +45,26 @@ powershell -ExecutionPolicy Bypass -File .\tools\build_windows.ps1 -Clean
 Output:
 
 ```text
-dist\BPM Light Mapper\BPM Light Mapper.exe
+dist\BeatScope\BeatScope.exe
 ```
+
+## Onefile Build
+
+`onefile` is available as a convenience build:
+
+```powershell
+.\tools\build_windows.ps1 -Clean -Onefile
+```
+
+Output:
+
+```text
+dist\BeatScope.exe
+```
+
+This uses [BeatScope_onefile.spec](../BeatScope_onefile.spec), embeds the BeatScope icon and bundles `BeatScope_brand_assets` so the logo and PNG/ICO resources are available through the same `_MEIPASS` resource helper used by the app.
+
+Keep `onedir` as the recommended release build until `onefile` has been tested on clean Windows machines. Scientific/audio stacks plus Qt plugins can be more fragile when extracted to PyInstaller's temporary runtime directory.
 
 ## What Is Bundled
 
@@ -56,6 +74,7 @@ The spec file includes:
 - PySide6 data/plugins collected by PyInstaller hooks
 - `librosa`, `numpy`, `scipy`, `sounddevice`, `soundfile`, `pyqtgraph`
 - test audio fixtures for the `Cargar Test` dropdown
+- BeatScope brand assets and application icon
 
 ## Build Failure Notes
 
@@ -68,7 +87,7 @@ If folders are created but there is no executable, inspect the PyInstaller error
 - optional packages such as `matplotlib`, `torch`, `pygame` being collected accidentally
 - PowerShell execution policy blocking the script
 
-The project spec excludes optional packages that are not used by BPM Light Mapper to avoid pulling broken or huge dependencies into the bundle.
+The project spec excludes optional packages that are not used by BeatScope to avoid pulling broken or huge dependencies into the bundle.
 
 ## What Is Not Guaranteed By Packaging
 
@@ -96,7 +115,7 @@ For the most reliable playback tests, use WAV or FLAC.
    .\tools\build_windows.ps1 -Clean
    ```
 
-3. Test the executable from `dist\BPM Light Mapper`:
+3. Test the executable from `dist\BeatScope`:
 
    - open app
    - use `Cargar Test`
@@ -110,11 +129,11 @@ For the most reliable playback tests, use WAV or FLAC.
 4. Zip the full folder:
 
    ```text
-   dist\BPM Light Mapper
+   dist\BeatScope
    ```
 
 Do not distribute only the `.exe` from the folder unless you switch to a tested `onefile` build.
 
 ## Onefile Note
 
-`onefile` can be attempted later, but it is not the default because audio/Qt plugins and scientific Python packages are more fragile when extracted to a temporary runtime directory.
+`onefile` is supported through `.\tools\build_windows.ps1 -Clean -Onefile`, but it is not the default because audio/Qt plugins and scientific Python packages are more fragile when extracted to a temporary runtime directory.

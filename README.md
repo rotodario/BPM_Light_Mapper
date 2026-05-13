@@ -1,6 +1,6 @@
-# BPM Light Mapper
+# BeatScope
 
-Aplicacion de escritorio en Python para mapear BPM de audio offline y detectar BPM en directo desde una entrada de audio.
+Aplicacion de escritorio en Python para analisis profesional de tempo y BPM offline y en directo.
 
 ## Objetivo
 
@@ -60,10 +60,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\build_windows.ps1 -Clean
 Salida:
 
 ```text
-dist\BPM Light Mapper\BPM Light Mapper.exe
+dist\BeatScope\BeatScope.exe
 ```
 
-Distribuye la carpeta completa `dist\BPM Light Mapper`, no solo el `.exe`.
+Distribuye la carpeta completa `dist\BeatScope`, no solo el `.exe`.
 Ver detalles y checklist en [docs/PACKAGING.md](docs/PACKAGING.md).
 
 ## Formatos soportados

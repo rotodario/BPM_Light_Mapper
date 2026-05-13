@@ -1,4 +1,4 @@
-# BPM Light Mapper Status
+# BeatScope Status
 
 ## Implemented
 

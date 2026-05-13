@@ -3,8 +3,8 @@ from __future__ import annotations
 from bisect import bisect_right
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import QCloseEvent, QPixmap
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
@@ -35,6 +35,7 @@ from bpm_light_mapper.app.export.export_csv import export_segments_csv, export_s
 from bpm_light_mapper.app.export.export_json import export_analysis_json
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.models.segment import Segment
+from bpm_light_mapper.app.ui.brand_assets import APP_NAME, APP_SUBTITLE, LOGO_DARK_PATH, window_icon
 from bpm_light_mapper.app.ui.live_panel import LivePanel
 from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
@@ -97,7 +98,10 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.logger = get_logger("ui.main_window")
-        self.setWindowTitle("BPM Light Mapper")
+        self.setWindowTitle(APP_NAME)
+        icon = window_icon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
         self.resize(1500, 940)
         self.current_file: str | None = None
         self.current_audio: dict | None = None
@@ -126,7 +130,7 @@ class MainWindow(QMainWindow):
         self.offline_tab = self._build_offline_tab()
         self.live_panel = LivePanel()
         self.live_panel.log_message.connect(self.log)
-        self.tabs.addTab(self.offline_tab, "OFFLINE MAP")
+        self.tabs.addTab(self.offline_tab, "OFFLINE ANALYSIS")
         self.tabs.addTab(self.live_panel, "LIVE")
         root_layout.addWidget(self.tabs, 1)
 
@@ -142,15 +146,30 @@ class MainWindow(QMainWindow):
         header = QFrame()
         header.setObjectName("AppHeader")
         layout = QHBoxLayout(header)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(12)
+        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setSpacing(16)
 
         title_block = QVBoxLayout()
-        self.app_title = QLabel("BPM Light Mapper")
-        self.app_title.setObjectName("AppTitle")
+        title_block.setSpacing(3)
+        self.logo_label = QLabel()
+        self.logo_label.setObjectName("BrandLogo")
+        self.logo_label.setMaximumHeight(52)
+        self.logo_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        if LOGO_DARK_PATH.exists():
+            pixmap = QPixmap(str(LOGO_DARK_PATH))
+            if not pixmap.isNull():
+                self.logo_label.setPixmap(
+                    pixmap.scaledToHeight(48, Qt.SmoothTransformation)
+                )
+        if self.logo_label.pixmap() is None or self.logo_label.pixmap().isNull():
+            self.logo_label.setText(APP_NAME)
+            self.logo_label.setObjectName("AppTitle")
+        self.app_subtitle = QLabel(APP_SUBTITLE)
+        self.app_subtitle.setObjectName("AppSubtitle")
         self.file_info = QLabel("Archivo: -")
         self.file_info.setObjectName("HeaderMeta")
-        title_block.addWidget(self.app_title)
+        title_block.addWidget(self.logo_label)
+        title_block.addWidget(self.app_subtitle)
         title_block.addWidget(self.file_info)
 
         self.status_badge = StatusBadge("IDLE")
@@ -175,13 +194,17 @@ class MainWindow(QMainWindow):
         self.live_nav_button = QPushButton("LIVE")
         self.live_nav_button.setProperty("role", "primary")
 
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        actions.addWidget(self.load_button)
+        actions.addWidget(self.test_audio_button)
+        actions.addWidget(self.analyze_button)
+        actions.addWidget(self.live_nav_button)
+
         layout.addLayout(title_block, 3)
         layout.addStretch(1)
         layout.addLayout(status_block, 2)
-        layout.addWidget(self.load_button)
-        layout.addWidget(self.test_audio_button)
-        layout.addWidget(self.analyze_button)
-        layout.addWidget(self.live_nav_button)
+        layout.addLayout(actions)
         return header
 
     def _build_offline_tab(self) -> QWidget:
@@ -190,14 +213,14 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        waveform_panel = SectionPanel("Waveform / Beat Grid / Tempo Zones")
+        waveform_panel = SectionPanel("WAVEFORM / BEAT GRID / TEMPO MAP")
         transport = QHBoxLayout()
         self.play_button = QPushButton("Play")
         self.play_button.setProperty("role", "primary")
         self.stop_button = QPushButton("Stop")
         self.position_label = QLabel("00:00.000")
         self.position_label.setObjectName("HeaderMeta")
-        self.offline_metronome = MetronomeIndicator("METRONOMO")
+        self.offline_metronome = MetronomeIndicator("METRONOME")
         self.offline_metronome.setMaximumWidth(260)
         transport.addWidget(self.play_button)
         transport.addWidget(self.stop_button)
@@ -279,13 +302,9 @@ class MainWindow(QMainWindow):
         metrics_grid.addWidget(self.zone_bpm_card, 1, 0, 1, 2)
         metrics_grid.addWidget(self.confidence_card, 2, 0)
         metrics_grid.addWidget(self.beat_ms_card, 2, 1)
-        metrics_grid.addWidget(self.candidates_card, 3, 0, 1, 2)
-        metrics_grid.addWidget(self.use_half_button, 4, 0)
-        metrics_grid.addWidget(self.use_detected_button, 4, 1)
-        metrics_grid.addWidget(self.use_double_button, 5, 0, 1, 2)
-        metrics_grid.addWidget(self.zone_count_card, 6, 0)
-        metrics_grid.addWidget(self.duration_card, 6, 1)
-        metrics_grid.addWidget(self.current_zone_card, 7, 0, 1, 2)
+        metrics_grid.addWidget(self.zone_count_card, 3, 0)
+        metrics_grid.addWidget(self.duration_card, 3, 1)
+        metrics_grid.addWidget(self.current_zone_card, 4, 0, 1, 2)
         metrics_panel.body.addLayout(metrics_grid)
 
         right = QWidget()
@@ -298,7 +317,14 @@ class MainWindow(QMainWindow):
         right_tabs = QTabWidget()
 
         timing_panel = SectionPanel("Timing")
+        tempo_choice_row = QHBoxLayout()
+        tempo_choice_row.setSpacing(6)
+        tempo_choice_row.addWidget(self.use_half_button)
+        tempo_choice_row.addWidget(self.use_detected_button)
+        tempo_choice_row.addWidget(self.use_double_button)
         self.offline_timing_grid = TimingGrid()
+        timing_panel.body.addWidget(self.candidates_card)
+        timing_panel.body.addLayout(tempo_choice_row)
         timing_panel.body.addWidget(self.offline_timing_grid)
         right_tabs.addTab(timing_panel, "Timing")
 
@@ -687,6 +713,7 @@ class MainWindow(QMainWindow):
         self.global_bpm_card.set_value(f"{candidate.bpm:.2f}", f"{label} seleccionado")
         self.confidence_card.set_value(f"{candidate.confidence:.2f}")
         self.beat_ms_card.set_value(f"{beat_ms:.2f}", "ms por negra")
+        self.candidates_card.set_value(self.candidates_card.value_label.text(), f"{label} activo")
         self.offline_timing_grid.set_beat_ms(beat_ms)
         self.log(f"Tempo candidate aplicado: {old_bpm:.2f} -> {candidate.bpm:.2f} BPM ({label}).")
 

@@ -1,5 +1,6 @@
 param(
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$Onefile
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,9 +31,14 @@ if ($Clean) {
 
 Invoke-Step "Installing runtime requirements" { python -m pip install -r requirements.txt }
 Invoke-Step "Installing build requirements" { python -m pip install -r requirements-build.txt }
-Invoke-Step "Running PyInstaller" { python -m PyInstaller --clean --noconfirm BPM_Light_Mapper.spec }
+if ($Onefile) {
+    Invoke-Step "Running PyInstaller onefile" { python -m PyInstaller --clean --noconfirm BeatScope_onefile.spec }
+    $exePath = Join-Path $repoRoot "dist\BeatScope.exe"
+} else {
+    Invoke-Step "Running PyInstaller onedir" { python -m PyInstaller --clean --noconfirm BeatScope.spec }
+    $exePath = Join-Path $repoRoot "dist\BeatScope\BeatScope.exe"
+}
 
-$exePath = Join-Path $repoRoot "dist\BPM Light Mapper\BPM Light Mapper.exe"
 if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Build did not create expected executable: $exePath"
 }

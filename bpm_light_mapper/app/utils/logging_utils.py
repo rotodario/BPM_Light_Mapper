@@ -12,8 +12,8 @@ from pathlib import Path
 
 
 LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
-LOG_FILE = LOG_DIR / "bpm_light_mapper.log"
-FALLBACK_LOG_FILE = Path(tempfile.gettempdir()) / "bpm_light_mapper.log"
+LOG_FILE = LOG_DIR / "beatscope.log"
+FALLBACK_LOG_FILE = Path(tempfile.gettempdir()) / "beatscope.log"
 
 
 def timestamped(message: str) -> str:
@@ -23,11 +23,11 @@ def timestamped(message: str) -> str:
 
 def setup_logging() -> logging.Logger:
     LOG_DIR.mkdir(exist_ok=True)
-    logger = logging.getLogger("bpm_light_mapper")
+    logger = logging.getLogger("beatscope")
     if logger.handlers:
         return logger
 
-    level_name = os.environ.get("BPM_LIGHT_MAPPER_LOG_LEVEL", "INFO").upper()
+    level_name = os.environ.get("BEATSCOPE_LOG_LEVEL", os.environ.get("BPM_LIGHT_MAPPER_LOG_LEVEL", "INFO")).upper()
     logger.setLevel(getattr(logging, level_name, logging.INFO))
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(threadName)s | %(name)s | %(message)s"
@@ -51,7 +51,8 @@ def setup_logging() -> logging.Logger:
         )
     file_handler.setFormatter(formatter)
 
-    if os.environ.get("BPM_LIGHT_MAPPER_CONSOLE_LOG", "1") != "0":
+    console_log = os.environ.get("BEATSCOPE_CONSOLE_LOG", os.environ.get("BPM_LIGHT_MAPPER_CONSOLE_LOG", "1"))
+    if console_log != "0":
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)

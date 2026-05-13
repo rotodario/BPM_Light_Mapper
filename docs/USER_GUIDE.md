@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`BPM Light Mapper` is intended for lighting preproduction and live support.
+`BeatScope` is intended for lighting preproduction and live support.
 
 Typical use cases:
 

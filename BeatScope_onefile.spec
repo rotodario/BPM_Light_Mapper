@@ -41,6 +41,12 @@ fixtures_dir = ROOT / "tests" / "audio" / "fixtures"
 if fixtures_dir.exists():
     datas.append((str(fixtures_dir), "tests/audio/fixtures"))
 
+brand_assets_dir = ROOT / "BeatScope_brand_assets"
+if brand_assets_dir.exists():
+    datas.append((str(brand_assets_dir), "BeatScope_brand_assets"))
+
+app_icon = brand_assets_dir / "beatscope.ico"
+
 
 a = Analysis(
     ["main.py"],
@@ -79,26 +85,21 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name="BPM Light Mapper",
+    name="BeatScope",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="BPM Light Mapper",
+    icon=str(app_icon) if app_icon.exists() else None,
 )
