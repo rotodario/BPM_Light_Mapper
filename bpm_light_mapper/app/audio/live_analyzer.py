@@ -453,9 +453,47 @@ class LiveBpmAnalyzer:
         if len(sorted_peaks) >= 4 and sorted_peaks[-1] > 1e-9:
             contrast = float((sorted_peaks[-1] - sorted_peaks[-4]) / sorted_peaks[-1])
         energy_score = float(np.clip(np.percentile(onset_env, 90) * 1.4, 0.0, 1.0))
+        bpm = self._resolve_techno_three_two_subdivision(corr, bpm)
         bpm = self._resolve_octave_by_peak_spacing(onset_env, bpm)
         confidence = (normalized_peak * 0.50) + (contrast * 0.25) + (energy_score * 0.25)
         return float(np.clip(bpm, self.bpm_min, self.bpm_max)), float(np.clip(confidence, 0.0, 1.0))
+
+    def _resolve_techno_three_two_subdivision(self, corr: np.ndarray, bpm: float) -> float:
+        """Promote common 80->120 metrical errors when the faster grid is supported.
+
+        Some steady 4/4 electronic tracks expose a strong 3:2 correlation peak.
+        The raw autocorrelation can then prefer ~80 BPM even when the useful
+        lighting clock is clearly ~120 BPM. This is intentionally narrow: it
+        only considers the x1.5 candidate in the normal dance-music area.
+        """
+        candidate = bpm * 1.5
+        if not (70.0 <= bpm <= 95.0 and 105.0 <= candidate <= 145.0):
+            return bpm
+        if candidate < self.bpm_min or candidate > self.bpm_max:
+            return bpm
+
+        current_score = self._correlation_score_for_bpm(corr, bpm)
+        candidate_score = self._correlation_score_for_bpm(corr, candidate)
+        if current_score <= 1e-9:
+            return bpm
+        if candidate_score >= current_score * 0.62:
+            self.logger.info(
+                "LIVE BPM promoted from %.2f to %.2f by 3:2 subdivision resolver",
+                bpm,
+                candidate,
+            )
+            return candidate
+        return bpm
+
+    def _correlation_score_for_bpm(self, corr: np.ndarray, bpm: float) -> float:
+        if bpm <= 0.0 or len(corr) == 0:
+            return 0.0
+        lag = int(round((60.0 * self.sample_rate) / (self.hop_length * bpm)))
+        if lag <= 0 or lag >= len(corr):
+            return 0.0
+        start = max(1, lag - 1)
+        end = min(len(corr), lag + 2)
+        return float(np.max(corr[start:end]))
 
     def _resolve_octave_by_peak_spacing(self, onset_env: np.ndarray, bpm: float) -> float:
         candidates = [bpm]

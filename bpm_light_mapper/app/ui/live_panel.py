@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from bpm_light_mapper.app.audio.live_analyzer import LiveBpmAnalyzer, LiveUpdate
+from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
 from bpm_light_mapper.app.ui.section_panel import SectionPanel
 from bpm_light_mapper.app.ui.status_badge import StatusBadge
@@ -65,6 +66,8 @@ class LivePanel(QWidget):
         self.target_state = "SEARCHING"
         self.live_candidate_mode = "Detected"
         self.latest_candidate_text = "-"
+        self.metronome_anchor = time()
+        self.metronome_beat_count = 0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -110,9 +113,11 @@ class LivePanel(QWidget):
         self.bpm_label.setStyleSheet("font-size: 76px; font-weight: 900; color: #28d7ff;")
         self.beat_label = QLabel("- ms / beat")
         self.beat_label.setObjectName("MetricSubtitle")
+        self.live_metronome = MetronomeIndicator("LIVE CLOCK")
         bpm_layout.addWidget(self.state_badge)
         bpm_layout.addWidget(self.bpm_label)
         bpm_layout.addWidget(self.beat_label)
+        bpm_layout.addWidget(self.live_metronome)
         bpm_frame.setMaximumWidth(460)
         bpm_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         cockpit.addWidget(bpm_frame, 0, 0, 2, 1)
@@ -275,6 +280,8 @@ class LivePanel(QWidget):
         self.target_state = "SEARCHING"
         self.live_candidate_mode = "Detected"
         self.latest_candidate_text = "-"
+        self.metronome_anchor = time()
+        self.metronome_beat_count = 0
         self.history_display[:] = np.nan
         self.render_timer.start()
         self.log_message.emit("LIVE iniciado.")
@@ -304,6 +311,7 @@ class LivePanel(QWidget):
         self.state_badge.set_status("SEARCHING")
         self.bpm_label.setText("0.00")
         self.beat_label.setText("- ms / beat")
+        self.live_metronome.set_active(False)
         self.conf_card.set_value("0.00")
         self.live_candidates_card.set_value("-")
         self.history_display[:] = np.nan
@@ -374,6 +382,9 @@ class LivePanel(QWidget):
                 display_state = "MANUAL LOCK"
             except ValueError:
                 pass
+        if self.target_bpm <= 0.0 or (display_bpm > 0.0 and abs(display_bpm - self.target_bpm) >= 2.0):
+            self.metronome_anchor = time()
+            self.metronome_beat_count = 0
         self.target_bpm = display_bpm
         self.target_confidence = update.confidence
         self.target_state = display_state
@@ -407,6 +418,7 @@ class LivePanel(QWidget):
         self.live_candidates_card.set_value(self.latest_candidate_text, self.live_candidate_mode)
         beat_ms = (60000.0 / display_bpm) if display_bpm > 0 else 0.0
         self.beat_label.setText(f"{beat_ms:.2f} ms / beat" if beat_ms else "- ms / beat")
+        self._render_live_metronome(display_bpm)
         self.timing_grid.set_beat_ms(beat_ms)
         if display_bpm > 0:
             self.history_display[:-1] = self.history_display[1:]
@@ -424,7 +436,22 @@ class LivePanel(QWidget):
     def _set_live_candidate_mode(self, mode: str) -> None:
         self.live_candidate_mode = mode
         self.live_candidates_card.set_value(self.latest_candidate_text, mode)
+        self.metronome_anchor = time()
+        self.metronome_beat_count = 0
         self.log_message.emit(f"Live tempo mode: {mode}.")
+
+    def _render_live_metronome(self, bpm: float) -> None:
+        if bpm <= 0.0:
+            self.live_metronome.set_active(False)
+            return
+        beat_seconds = 60.0 / bpm
+        elapsed = max(0.0, time() - self.metronome_anchor)
+        beat_index = int(elapsed / beat_seconds)
+        phase = (elapsed % beat_seconds) / beat_seconds
+        if beat_index != self.metronome_beat_count:
+            self.metronome_beat_count = beat_index
+        next_ms = int((1.0 - phase) * beat_seconds * 1000)
+        self.live_metronome.set_active(True, f"Beat {beat_index + 1}", f"next {next_ms} ms", phase)
 
     def _live_bpm_range(self) -> tuple[float, float]:
         ranges = {

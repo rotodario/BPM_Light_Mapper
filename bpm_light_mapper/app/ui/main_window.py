@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_right
 from pathlib import Path
 
 from PySide6.QtCore import QThread, QTimer, QUrl, Signal
@@ -35,6 +36,7 @@ from bpm_light_mapper.app.export.export_json import export_analysis_json
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.models.segment import Segment
 from bpm_light_mapper.app.ui.live_panel import LivePanel
+from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
 from bpm_light_mapper.app.ui.section_panel import SectionPanel
 from bpm_light_mapper.app.ui.segment_table import SegmentTable
@@ -195,10 +197,13 @@ class MainWindow(QMainWindow):
         self.stop_button = QPushButton("Stop")
         self.position_label = QLabel("00:00.000")
         self.position_label.setObjectName("HeaderMeta")
+        self.offline_metronome = MetronomeIndicator("METRONOMO")
+        self.offline_metronome.setMaximumWidth(260)
         transport.addWidget(self.play_button)
         transport.addWidget(self.stop_button)
         transport.addWidget(self.position_label)
         transport.addStretch(1)
+        transport.addWidget(self.offline_metronome)
         self.waveform_widget = WaveformWidget()
         waveform_panel.body.addLayout(transport)
         waveform_panel.body.addWidget(self.waveform_widget)
@@ -730,6 +735,7 @@ class MainWindow(QMainWindow):
     def stop_playback(self) -> None:
         self.player.stop()
         self.waveform_widget.set_playhead(0.0)
+        self.offline_metronome.set_active(False)
         self.position_label.setText("00:00.000")
 
     def seek_playback(self, seconds: float) -> None:
@@ -747,6 +753,7 @@ class MainWindow(QMainWindow):
         seconds = milliseconds / 1000.0
         self.waveform_widget.set_playhead(seconds)
         self.position_label.setText(self._format_position_ms(milliseconds))
+        self._update_offline_metronome(seconds)
         self.selecting_from_waveform = True
         try:
             self.select_segment_at_time(seconds)
@@ -755,6 +762,8 @@ class MainWindow(QMainWindow):
 
     def on_player_state_changed(self, state) -> None:
         self.play_button.setText("Pause" if state == QMediaPlayer.PlayingState else "Play")
+        if state != QMediaPlayer.PlayingState:
+            self.offline_metronome.set_active(False, detail="pausado")
 
     def on_segment_selected(self, row: int) -> None:
         if self.analysis_result is None or row < 0 or row >= len(self.analysis_result.segments):
@@ -795,6 +804,26 @@ class MainWindow(QMainWindow):
                         self.segment_table.scrollToItem(item)
                 self.waveform_widget.highlight_segment(index)
                 return
+
+    def _update_offline_metronome(self, seconds: float) -> None:
+        if self.analysis_result is None or not self.analysis_result.beat_times:
+            self.offline_metronome.set_active(False)
+            return
+        beat_times = self.analysis_result.beat_times
+        index = bisect_right(beat_times, seconds) - 1
+        if index < 0:
+            next_ms = int(max(0.0, beat_times[0] - seconds) * 1000)
+            self.offline_metronome.set_active(False, "pre-roll", f"next {next_ms} ms")
+            return
+        if index >= len(beat_times) - 1:
+            self.offline_metronome.set_active(True, f"Beat {index + 1}", "ultimo beat", 0.0)
+            return
+        current_beat = beat_times[index]
+        next_beat = beat_times[index + 1]
+        interval = max(1e-6, next_beat - current_beat)
+        phase = (seconds - current_beat) / interval
+        next_ms = int(max(0.0, next_beat - seconds) * 1000)
+        self.offline_metronome.set_active(True, f"Beat {index + 1}", f"next {next_ms} ms", phase)
 
     def refresh_segment_view(self) -> None:
         if self.analysis_result is None:

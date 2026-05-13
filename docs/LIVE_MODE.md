@@ -21,6 +21,7 @@ It should help an operator answer:
 - state display
 - BPM history graph
 - optimized live waveform envelope
+- visual metronome pulse driven by the selected/displayed BPM
 - tap tempo
 - manual tap lock
 - BPM x and BPM / timing grid for lighting divisions
@@ -58,6 +59,20 @@ Live mode evaluates candidate tempos around the detected value:
 
 Use the candidate buttons when the useful lighting clock differs from the detected rhythmic subdivision.
 For example, a 60 BPM groove with hats can produce a strong 120 BPM detection; selecting half-time keeps the display and timing grid aligned to 60 BPM.
+
+## 3:2 Techno Subdivision Guard
+
+Some steady 4/4 electronic tracks around 120 BPM can produce a strong correlation peak near 80 BPM because of phrase/accent spacing.
+
+Live mode now applies a narrow guard for that case:
+
+- if the raw estimate is around `70-95 BPM`
+- and the `x1.5` grid lands around `105-145 BPM`
+- and that faster grid is also strongly supported
+
+then the displayed live BPM is promoted to the faster lighting-useful clock.
+
+This is intentionally limited so genuine slow material is not blindly multiplied.
 
 ## Detection States
 
@@ -163,6 +178,16 @@ The timing grid shows the base BPM multiplied and divided by common lighting fac
 and the corresponding `/` column for lower-rate equivalents.
 
 This is useful when you want to program chases, strobes or bumps against a faster or slower clock without doing the mental math live.
+
+## Visual Metronome
+
+The live metronome is a display-only pulse. It follows the BPM currently shown after candidate selection, tap lock or half-time normalization.
+
+It is intentionally visual only:
+
+- no audio click is generated
+- it does not touch the audio callback
+- it is rendered from the UI timer to avoid adding latency or driver risk
 
 ## Limitations
 

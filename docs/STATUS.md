@@ -8,6 +8,7 @@
 - global BPM estimation
 - half-time/detected/double-time tempo candidate scoring
 - beat detection
+- visual metronome for offline beat-grid/playhead validation
 - local BPM window analysis
 - tempo-zone segmentation with contiguous non-overlapping boundaries
 - segment table editing
@@ -20,10 +21,12 @@
 - live device listing
 - live BPM estimation with rolling history
 - live lock state based on operational BPM stability instead of requiring very high confidence
+- live 3:2 subdivision guard for 120 BPM electronic material misread near 80 BPM
 - fixed-rate live UI render loop decoupled from audio/DSP updates
 - optimized live waveform envelope using bounded min/max reduction
 - live tempo candidate selection for half-time/double-time ambiguity
 - live confidence and state labels
+- visual live metronome driven by displayed BPM
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
 - dark styled dropdowns for test loading and live input selection
@@ -35,7 +38,7 @@
 
 ## Not Implemented Yet
 
-- click/metronome preview
+- audible click/metronome preview
 - draggable segment boundary editing
 - explicit beat audition
 - persistent project save/load
