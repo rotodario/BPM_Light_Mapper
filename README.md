@@ -72,6 +72,7 @@ dist\BeatScope\BeatScope.exe
 
 Distribuye la carpeta completa `dist\BeatScope`, no solo el `.exe`.
 Ver detalles y checklist en [docs/PACKAGING.md](docs/PACKAGING.md).
+La build `onedir` incluye `tests/audio/fixtures` para que `Cargar Test` funcione desde el ejecutable.
 
 Build opcional `onefile`:
 

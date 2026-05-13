@@ -37,6 +37,7 @@
 - committed synthetic audio fixtures and validation runner
 - Markdown BPM validation report generation
 - PyInstaller `onedir` packaging config for Windows executable builds
+- packaged `onedir` test-audio fixtures for the `Cargar Test` workflow
 
 ## Not Implemented Yet
 

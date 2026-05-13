@@ -38,6 +38,10 @@ brand_assets_dir = ROOT / "BeatScope_brand_assets"
 if brand_assets_dir.exists():
     datas.append((str(brand_assets_dir), "BeatScope_brand_assets"))
 
+test_fixtures_dir = ROOT / "tests" / "audio" / "fixtures"
+if test_fixtures_dir.exists():
+    datas.append((str(test_fixtures_dir), "tests/audio/fixtures"))
+
 app_icon = brand_assets_dir / "beatscope.ico"
 splash_image = brand_assets_dir / "beatscope_splash.png"
 

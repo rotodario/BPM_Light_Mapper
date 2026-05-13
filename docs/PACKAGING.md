@@ -90,8 +90,9 @@ The spec file includes:
 - BeatScope brand assets and application icon
 - PyInstaller splash image when `BeatScope_brand_assets/beatscope_splash.png` exists
 - runtime splash status text with the current-year author credit from the app branding module
+- synthetic test audio fixtures in the recommended `onedir` build so `Cargar Test` works from `dist\BeatScope\BeatScope.exe`
 
-Synthetic test WAV fixtures are not bundled in production builds by default. They are useful during development and validation, but add significant size to the executable folder. In packaged builds, `Cargar Test` will simply report that the fixture folder is not available.
+Synthetic test WAV fixtures add roughly 60 MB to the packaged folder. They are bundled in the recommended `onedir` build for QA and demo convenience. The optional `onefile` build keeps them out by default to avoid making the single executable larger and slower to extract.
 
 ## Build Failure Notes
 
