@@ -153,6 +153,24 @@ For the most reliable playback tests, use WAV or FLAC.
 
 Do not distribute only the `.exe` from the folder unless you switch to a tested `onefile` build.
 
+## Inno Setup Installer
+
+The Inno Setup script [BeatScope.iss](../BeatScope.iss) packages the recommended `onedir` build. Build the app first:
+
+```powershell
+.\build_onedir.bat
+```
+
+Then compile `BeatScope.iss` from Inno Setup.
+
+Important: the installer must preserve PyInstaller's folder layout. Copying only the contents of `dist\BeatScope\_internal` into `{app}` breaks the PyInstaller splash runtime and can produce:
+
+```text
+SPLASH: failed to load Tcl/Tk shared files
+```
+
+The correct Inno `[Files]` rule copies `dist\BeatScope\*` recursively into `{app}`, leaving `_internal` as a sibling of `BeatScope.exe`.
+
 ## Onefile Note
 
 `onefile` is supported through `.\tools\build_windows.ps1 -Clean -Onefile`, but it is not the default because audio/Qt plugins and scientific Python packages are more fragile when extracted to a temporary runtime directory.
