@@ -57,7 +57,9 @@ def load_audio(file_path: str, target_sr: int | None = None) -> dict[str, Any]:
         audio_format = info.format
         frame_count = len(mono)
 
-    waveform = mono / max(np.max(np.abs(mono)), 1e-9)
+    peak_amplitude = float(np.max(np.abs(mono))) if len(mono) else 0.0
+    rms_energy = float(np.sqrt(np.mean(np.square(mono)))) if len(mono) else 0.0
+    waveform = mono / max(peak_amplitude, 1e-9)
 
     return {
         "file_path": str(path),
@@ -67,6 +69,8 @@ def load_audio(file_path: str, target_sr: int | None = None) -> dict[str, Any]:
         "original_sample_rate": raw_sr,
         "channels": channels,
         "waveform": waveform.astype(np.float32),
+        "peak_amplitude": peak_amplitude,
+        "rms_energy": rms_energy,
         "frames": frame_count,
         "subtype": subtype,
         "format": audio_format,
@@ -96,8 +100,8 @@ def load_audio_preview(file_path: str, max_points: int = 5000) -> dict[str, Any]
                 mono = block.mean(axis=1)
                 chunks.append(np.array([np.max(np.abs(mono))], dtype=np.float32))
         preview = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
-        peak = max(float(np.max(np.abs(preview))), 1e-9)
-        preview = preview / peak
+        peak = float(np.max(np.abs(preview))) if len(preview) else 0.0
+        preview = preview / max(peak, 1e-9)
 
     return {
         "file_path": str(path),
@@ -107,6 +111,8 @@ def load_audio_preview(file_path: str, max_points: int = 5000) -> dict[str, Any]
         "channels": channels,
         "frames": total_frames,
         "waveform": preview.astype(np.float32),
+        "peak_amplitude": peak if total_frames > 0 else 0.0,
+        "rms_energy": float(np.sqrt(np.mean(np.square(preview)))) if len(preview) else 0.0,
         "subtype": info.subtype,
         "format": info.format,
     }

@@ -25,6 +25,7 @@ bpm_light_mapper/
   app/
     audio/
     export/
+    light_mood/
     models/
     ui/
     utils/
@@ -85,6 +86,17 @@ bpm_light_mapper/
   - runs analysis against controlled cases
   - produces a report for BPM error and segment count
 
+### `app/light_mood`
+
+- `mood_engine.py`
+  - optional recommendation layer on top of `AnalysisResult`
+  - estimates musical mood from BPM, confidence, RMS energy, transient level and tempo stability
+  - leaves tonal/key fields as `unknown` until harmonic analysis exists
+
+- `lighting_palette_engine.py`
+  - maps moods to stage-lighting recipes
+  - uses lighting language such as congo blue, CTO/CTB, backlight, movement speed, fade type and operator notes
+
 ### `app/models`
 
 - `segment.py`
@@ -106,7 +118,7 @@ bpm_light_mapper/
   - segment editing actions
   - playback transport and playhead synchronization
   - waveform/table segment selection coordination
-  - compact tabbed offline layout for segments/terminal and timing/export/advanced controls
+  - compact tabbed offline layout for segments/terminal and timing/light mood/export/advanced controls
   - export actions
 
 - `waveform_widget.py`
@@ -141,6 +153,10 @@ bpm_light_mapper/
   - reusable HUD components for prominent BPM, confidence, status, timing and visual beat pulse displays
   - input level meter maps RMS/peak values to dBFS, draws fixed scale zones, peak markers and clip latches
   - metronome LED rendering uses a single UI frame timer, real beat timing, exponential release and proportional glow instead of ON/OFF stylesheet blinking
+
+- `light_mood_panel.py`
+  - presents the optional LightMood recommendation as a lighting-oriented card
+  - shows mood, confidence, palette, show parameters, explanation and operator notes
 
 ### `app/export`
 

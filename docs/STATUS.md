@@ -28,6 +28,7 @@
 - live tempo candidate selection for half-time/double-time ambiguity
 - live confidence and state labels
 - visual live metronome driven by displayed BPM with proportional glow and high-BPM decay limiting
+- LightMood Engine for offline mood estimation and stage-lighting recipe suggestions
 - tap tempo and manual lock
 - dark HUD UI theme for offline and live operation
 - dark styled dropdowns for test loading and live input selection

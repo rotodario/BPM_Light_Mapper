@@ -56,6 +56,36 @@ QFrame#SectionPanel, QFrame#MetricCard, QFrame#TimingGrid {{
     border-radius: 8px;
 }}
 
+QFrame#LightMoodCard {{
+    background: #08111A;
+    border: 1px solid #1E3447;
+    border-radius: 8px;
+}}
+
+QLabel#LightMoodTitle {{
+    color: {COLORS["lime"]};
+    font-size: 24px;
+    font-weight: 900;
+}}
+
+QLabel#LightMoodMeta {{
+    color: {COLORS["muted"]};
+    font-size: 11px;
+    font-weight: 800;
+}}
+
+QLabel#LightMoodText {{
+    color: {COLORS["text"]};
+    font-size: 12px;
+    line-height: 130%;
+}}
+
+QLabel#LightMoodValue {{
+    color: {COLORS["text"]};
+    font-size: 12px;
+    font-weight: 700;
+}}
+
 QFrame#SectionPanel:hover, QFrame#MetricCard:hover {{
     border-color: #2b4c66;
 }}

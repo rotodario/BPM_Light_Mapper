@@ -34,6 +34,7 @@ from bpm_light_mapper.app.export.export_json import export_analysis_json
 from bpm_light_mapper.app.models.analysis_result import AnalysisResult
 from bpm_light_mapper.app.models.segment import Segment
 from bpm_light_mapper.app.ui.brand_assets import APP_NAME, APP_SUBTITLE, FOOTER_TEXT, LOGO_DARK_PATH, window_icon
+from bpm_light_mapper.app.ui.light_mood_panel import LightMoodPanel
 from bpm_light_mapper.app.ui.live_panel import LivePanel
 from bpm_light_mapper.app.ui.metronome_indicator import MetronomeIndicator
 from bpm_light_mapper.app.ui.metric_card import MetricCard
@@ -358,6 +359,11 @@ class MainWindow(QMainWindow):
         export_panel.body.addLayout(export_row)
         right_tabs.addTab(export_panel, "Exportacion")
 
+        self.light_mood_panel = LightMoodPanel()
+        light_mood_section = SectionPanel("LightMood Engine")
+        light_mood_section.body.addWidget(self.light_mood_panel)
+        right_tabs.addTab(light_mood_section, "LightMood")
+
         advanced_box = self._build_params_box()
         right_tabs.addTab(advanced_box, "Advanced")
         right_layout.addWidget(right_tabs, 1)
@@ -554,6 +560,8 @@ class MainWindow(QMainWindow):
         ]:
             card.set_value("-")
         self.offline_timing_grid.set_beat_ms(0.0)
+        if hasattr(self, "light_mood_panel"):
+            self.light_mood_panel.reset()
 
     def _track_thread(self, thread: QThread) -> None:
         BACKGROUND_THREADS.append(thread)
@@ -694,6 +702,7 @@ class MainWindow(QMainWindow):
         self.zone_count_card.set_value(str(len(result.segments)))
         self.duration_card.set_value(self._format_duration(result.duration), f"{result.duration:.2f}s")
         self.offline_timing_grid.set_beat_ms(beat_ms)
+        self._update_light_mood()
         self.log("Analisis calculado. Renderizando waveform, beats y segmentos...")
         QTimer.singleShot(0, self._render_analysis_result)
 
@@ -736,7 +745,22 @@ class MainWindow(QMainWindow):
         self.beat_ms_card.set_value(f"{beat_ms:.2f}", "ms por negra")
         self.candidates_card.set_value(self.candidates_card.value_label.text(), f"{label} activo")
         self.offline_timing_grid.set_beat_ms(beat_ms)
+        self._update_light_mood()
         self.log(f"Tempo candidate aplicado: {old_bpm:.2f} -> {candidate.bpm:.2f} BPM ({label}).")
+
+    def _update_light_mood(self) -> None:
+        if self.analysis_result is None:
+            self.light_mood_panel.reset()
+            return
+        from bpm_light_mapper.app.light_mood import analyze_light_mood
+
+        recommendation = analyze_light_mood(self.analysis_result, self.current_audio)
+        self.light_mood_panel.set_recommendation(recommendation)
+        self.log(
+            f"LightMood: {recommendation.mood} "
+            f"({recommendation.confidence:.0%}) - {recommendation.recipe.base_color} / "
+            f"{recommendation.recipe.secondary_color}"
+        )
 
     def apply_beat_offset(self) -> None:
         if self.analysis_result is None:

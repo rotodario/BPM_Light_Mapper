@@ -11,6 +11,7 @@ Pensada para preproduccion y operacion de iluminacion:
 - Beat grid visual
 - Pipeline offline separado del Live con spectral flux multibanda, tempogram, diagnostico y beat grid
 - Metronomo visual offline/live con LED balistico para validar el pulso sin generar click audible
+- LightMood Engine para estimar mood musical y proponer recetas de iluminacion escenica
 - Zonas con cambios de tempo
 - Correccion manual de segmentos
 - Exportacion a JSON, CSV y TXT
@@ -122,7 +123,8 @@ La UI offline esta organizada como panel tecnico:
 - waveform y beat grid arriba
 - `Segmentos` y `Terminal` en pestanas
 - `Indicadores` en columna propia
-- `Timing`, `Exportacion` y `Advanced` en pestanas laterales
+- `Timing`, `LightMood`, `Exportacion` y `Advanced` en pestanas laterales
+- `LightMood` muestra mood estimado, confianza, paleta de luz, parametros de show y notas para operador
 
 ## Modo live
 
